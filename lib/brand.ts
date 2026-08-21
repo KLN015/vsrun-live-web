@@ -38,7 +38,15 @@ export type Brand = {
  * ce qui permet d'accepter un fichier libre sans qu'aucun texte d'organisateur
  * n'atteigne une feuille de style.
  */
-export type BrandFont =
+export type BrandFont = {
+  /**
+   * Facteur de taille, et non une taille en pixels : un écran de diffusion
+   * s'affiche aussi bien sur un vidéoprojecteur que sur un mur 4K, et ses
+   * tailles sont déjà relatives à sa largeur. Ce que l'organisateur règle,
+   * c'est le rapport entre ses titres, son texte et ses chiffres.
+   */
+  scale: number;
+} & (
   | { source: "library"; key: BrandFontKey; name: string }
   | {
       source: "custom";
@@ -47,7 +55,8 @@ export type BrandFont =
       family: string;
       css_format: string;
       url: string;
-    };
+    }
+);
 
 export type BrandFontKey =
   | "inter"
@@ -83,6 +92,11 @@ export function brandStyle(brand: Brand): CSSProperties {
     "--brand-font-heading": fontFamily(brand.fonts.heading),
     "--brand-font-body": fontFamily(brand.fonts.body),
     "--brand-font-numeric": fontFamily(brand.fonts.numeric),
+
+    // Multiplicateurs, appliqués par `scaled()` là où une taille est posée.
+    "--brand-scale-heading": String(brand.fonts.heading.scale ?? 1),
+    "--brand-scale-body": String(brand.fonts.body.scale ?? 1),
+    "--brand-scale-numeric": String(brand.fonts.numeric.scale ?? 1),
   } as CSSProperties;
 }
 
@@ -100,4 +114,15 @@ export function customFonts(brand: Brand) {
   }
 
   return [...seen.values()];
+}
+
+/**
+ * Une taille de police multipliée par le facteur de sa famille.
+ *
+ * `calc()` plutôt qu'un calcul en JavaScript : la valeur de base peut être un
+ * `clamp()` dépendant de la largeur de l'écran, que seul le navigateur sait
+ * résoudre. Le repli à 1 garde les pages non habillées d'une charte lisibles.
+ */
+export function scaled(base: string, slot: "heading" | "body" | "numeric"): string {
+  return `calc(${base} * var(--brand-scale-${slot}, 1))`;
 }

@@ -1,5 +1,5 @@
 import { BrandFontFaces } from "@/components/brand-faces";
-import { brandStyle, type Brand } from "@/lib/brand";
+import { brandStyle, scaled, type Brand } from "@/lib/brand";
 import {
   DISPLAY_LAYOUT_GRID,
   DISPLAY_ZONE_SPAN,
@@ -101,11 +101,12 @@ function Zone({ zone, compact }: { zone: RenderedZone; compact: boolean }) {
   return (
     <div className="flex h-full flex-col">
       <h2
-        style={{ fontFamily: "var(--brand-font-heading)", color: "var(--brand-accent)" }}
-        className={cn(
-          "mb-2 shrink-0 font-semibold tracking-tight",
-          compact ? "text-[11px]" : "text-2xl",
-        )}
+        style={{
+          fontFamily: "var(--brand-font-heading)",
+          color: "var(--brand-accent)",
+          fontSize: scaled(compact ? "11px" : "3rem", "heading"),
+        }}
+        className="mb-2 shrink-0 font-semibold tracking-tight"
       >
         {title}
       </h2>
@@ -165,10 +166,8 @@ function ResultList({
   if (results.length === 0) {
     return (
       <p
-        className={cn(
-          "text-neutral-600",
-          compact ? "text-[10px]" : "text-lg",
-        )}
+        className="text-neutral-600"
+        style={{ fontSize: scaled(compact ? "10px" : "1.96875rem", "body") }}
       >
         En attente de résultats
       </p>
@@ -180,10 +179,8 @@ function ResultList({
       {results.map((result) => (
         <li
           key={result.id}
-          className={cn(
-            "flex items-baseline gap-3 border-b border-neutral-800 py-1 last:border-0",
-            compact ? "text-[10px]" : "text-xl",
-          )}
+          className="flex items-baseline gap-3 border-b border-neutral-800 py-1 last:border-0"
+          style={{ fontSize: scaled(compact ? "10px" : "2.1875rem", "body") }}
         >
           <span
             className={cn(
@@ -198,7 +195,15 @@ function ResultList({
             {result.participant?.display_name ?? "—"}
           </span>
 
-          <span className="shrink-0  font-semibold tabular-nums" style={{ fontFamily: "var(--brand-font-numeric)" }}>
+          {/* La marque a sa propre famille *et* sa propre taille : c'est ce
+              qu'on lit depuis le fond de la tribune. */}
+          <span
+            className="shrink-0 font-semibold tabular-nums"
+            style={{
+              fontFamily: "var(--brand-font-numeric)",
+              fontSize: scaled(compact ? "10px" : "3.125rem", "numeric"),
+            }}
+          >
             {result.display_value}
           </span>
         </li>

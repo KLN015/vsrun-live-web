@@ -16,6 +16,37 @@ import {
  * traduit en deux champs distincts pour l'API — l'organisateur, lui, n'a qu'un
  * choix à faire.
  */
+/**
+ * Tailles proposées, en pourcentage de la taille normale.
+ *
+ * Une liste fermée plutôt qu'un champ libre : le réglage ne demande pas de
+ * précision au centième. Les pas se desserrent vers le haut — entre 100 et
+ * 125 % l'écart se voit, entre 300 et 325 % non.
+ *
+ * Jusqu'au quadruple : un écran dédié à une seule épreuve, lu du fond d'un
+ * stade, demande des chiffres bien plus gros que la normale. Passé un certain
+ * point la liste affiche moins de lignes — elle se coupe proprement plutôt que
+ * de déborder.
+ */
+const SCALES = [
+  "0.75",
+  "0.9",
+  "1",
+  "1.1",
+  "1.25",
+  "1.5",
+  "1.75",
+  "2",
+  "2.5",
+  "3",
+  "4",
+].map(
+  (value) => ({
+    value,
+    label: `${Math.round(Number(value) * 100)} %${value === "1" ? " (normal)" : ""}`,
+  }),
+);
+
 function fontChoice(font: BrandFont | undefined, fallback: string): string {
   if (!font) return `lib:${fallback}`;
 
@@ -46,13 +77,26 @@ export function BrandFields({
   ] as const;
 
   const slots = [
-    ["heading", "Titres", fontChoice(brand?.fonts.heading, "oswald"), undefined],
-    ["body", "Texte", fontChoice(brand?.fonts.body, "inter"), undefined],
+    [
+      "heading",
+      "Titres",
+      fontChoice(brand?.fonts.heading, "oswald"),
+      brand?.fonts.heading.scale,
+      undefined,
+    ],
+    [
+      "body",
+      "Texte",
+      fontChoice(brand?.fonts.body, "inter"),
+      brand?.fonts.body.scale,
+      undefined,
+    ],
     [
       "numeric",
       "Chiffres",
       fontChoice(brand?.fonts.numeric, "barlow-condensed"),
-      "Chronos, distances, rangs : elle se lit à trente mètres.",
+      brand?.fonts.numeric.scale,
+      undefined,
     ],
   ] as const;
 
@@ -95,14 +139,24 @@ export function BrandFields({
       </div>
 
       <div className="grid gap-3 sm:grid-cols-3">
-        {slots.map(([slot, label, value, hint]) => (
-          <Field key={slot} label={label} hint={hint}>
-            <FormSelect
-              name={`${slot}_font_choice`}
-              defaultValue={value}
-              options={options}
-            />
-          </Field>
+        {slots.map(([slot, label, value, scale, hint]) => (
+          <div key={slot} className="space-y-3">
+            <Field label={label} hint={hint}>
+              <FormSelect
+                name={`${slot}_font_choice`}
+                defaultValue={value}
+                options={options}
+              />
+            </Field>
+
+            <Field label="Taille">
+              <FormSelect
+                name={`${slot}_scale`}
+                defaultValue={String(scale ?? 1)}
+                options={SCALES}
+              />
+            </Field>
+          </div>
         ))}
       </div>
     </>

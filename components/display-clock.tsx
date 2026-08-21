@@ -1,6 +1,7 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useLayoutEffect, useRef, useState } from "react";
+import { scaled } from "@/lib/brand";
 import { fireGunshot } from "@/lib/gunshot";
 import type { Clock } from "@/lib/types";
 
@@ -70,8 +71,9 @@ export function DisplayClock({ clock }: { clock: Clock }) {
       data-running={clock.running}
     >
       <span
-        className="text-[clamp(3rem,9vw,7.5rem)] leading-none font-bold tabular-nums"
+        className="leading-none font-bold tabular-nums"
         style={{
+          fontSize: scaled("clamp(3rem, 9vw, 7.5rem)", "numeric"),
           fontFamily: "var(--brand-font-numeric, var(--font-mono))",
           color: clock.running ? "var(--brand-accent)" : "var(--brand-text)",
           textShadow: clock.running
@@ -163,15 +165,88 @@ export function DisplayCountdown({ clock }: { clock: Clock }) {
           phase === "go" ? "var(--brand-accent)" : "var(--brand-background)",
       }}
     >
-      <span
-        className="px-8 text-center text-[clamp(4rem,16vw,18rem)] leading-none font-extrabold tracking-widest uppercase"
+      <FittedText
+        className="px-8 text-center leading-none font-extrabold tracking-widest uppercase"
         style={{
           color: phase === "go" ? "#0a0a0a" : "var(--brand-text)",
           fontFamily: "var(--brand-font-heading)",
         }}
       >
         {labels[phase]}
-      </span>
+      </FittedText>
     </div>
+  );
+}
+
+/** Part de cette taille, puis se réduit à ce que l'écran permet. */
+const PROBE_SIZE = 100;
+
+/** Marge laissée autour du texte : sans elle, les jambages touchent le bord. */
+const FILL = 0.92;
+
+/**
+ * Un texte porté à la plus grande taille qui tienne dans l'écran.
+ *
+ * Trois phrases se succèdent ici — « À vos marques », « Prêt », « Go » — et
+ * leurs longueurs n'ont rien à voir. Une taille unique ne peut pas les servir :
+ * réglée pour la plus longue, « Go » reste petit au moment qui compte ; réglée
+ * pour « Go », la première déborde de l'écran.
+ *
+ * D'où la mesure plutôt qu'un calcul : on rend le texte à une taille connue, on
+ * regarde la place qu'il prend, et on en déduit le facteur en une fois — les
+ * dimensions d'un texte varient linéairement avec sa taille. Aucune hypothèse
+ * sur la largeur des lettres, ce qui compte depuis qu'un organisateur peut
+ * déposer sa propre police : ses métriques nous sont inconnues.
+ *
+ * La mesure est refaite quand la police arrive, quand la fenêtre change, et à
+ * chaque phrase. `useLayoutEffect` la place avant l'affichage : on ne voit
+ * jamais le texte à la taille d'essai.
+ */
+function FittedText({
+  children,
+  className,
+  style,
+}: {
+  children: string;
+  className?: string;
+  style?: React.CSSProperties;
+}) {
+  const span = useRef<HTMLSpanElement>(null);
+
+  useLayoutEffect(() => {
+    const element = span.current;
+
+    if (!element) return;
+
+    const fit = () => {
+      element.style.fontSize = `${PROBE_SIZE}px`;
+
+      const { width, height } = element.getBoundingClientRect();
+
+      if (width === 0 || height === 0) return;
+
+      const factor = Math.min(
+        (window.innerWidth * FILL) / width,
+        (window.innerHeight * FILL) / height,
+      );
+
+      element.style.fontSize = `${PROBE_SIZE * factor}px`;
+    };
+
+    fit();
+
+    // Une police déposée arrive après le premier rendu : sans cette seconde
+    // mesure, la taille resterait celle calculée sur la police de repli.
+    void document.fonts?.ready.then(fit);
+
+    window.addEventListener("resize", fit);
+
+    return () => window.removeEventListener("resize", fit);
+  }, [children]);
+
+  return (
+    <span ref={span} className={className} style={style}>
+      {children}
+    </span>
   );
 }
