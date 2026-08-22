@@ -15,8 +15,24 @@
  * approximative que le silence sur la ligne de départ.
  */
 let context: AudioContext | null = null;
+
+/**
+ * Les octets du fichier, puis le son décodé.
+ *
+ * Deux étapes séparées à dessein. Le téléchargement ne dépend pas du graphe
+ * audio et peut avoir lieu dès l'ouverture de la page ; le décodage, lui,
+ * réclame un contexte, et un contexte suspendu — celui d'une page qui n'a
+ * encore reçu aucun geste — le rend au mieux tardif. Les confondre faisait
+ * partir le premier départ à la synthèse, faute d'avoir eu le temps.
+ *
+ * `decodeAudioData` vide le tampon qu'on lui donne : on en décode toujours une
+ * copie, sans quoi une seconde tentative n'aurait plus rien à lire.
+ */
+let bytes: ArrayBuffer | null = null;
 let buffer: AudioBuffer | null = null;
-let loading = false;
+
+let fetching: Promise<void> | null = null;
+let decoding: Promise<void> | null = null;
 
 /**
  * Le graphe audio est-il autorisé à sonner ?
@@ -51,26 +67,50 @@ export async function unlockAudio(): Promise<boolean> {
     }
   }
 
-  if (!buffer && !loading) {
-    loading = true;
-    void load();
-  }
+  void primeGunshot();
 
   return audioIsReady();
 }
 
-async function load(): Promise<void> {
-  if (!context) return;
+/**
+ * Prépare le coup de feu : fichier téléchargé, son décodé, prêt à partir.
+ *
+ * À appeler dès qu'un départ se profile — au lancement du compte à rebours, et
+ * non au « Go ». Cinq secondes de préavis suffisent largement, alors qu'au
+ * moment du départ il ne reste rien.
+ *
+ * Idempotente, et surtout **réessayable** : un échec ne laisse pas de drapeau
+ * qui interdirait la tentative suivante. C'est ce qui manquait — un décodage
+ * refusé par un contexte encore suspendu condamnait la page à la synthèse.
+ */
+export async function primeGunshot(): Promise<void> {
+  fetching ??= (async () => {
+    try {
+      const response = await fetch("/audio/gunshot.mp3");
 
-  try {
-    const response = await fetch("/audio/gunshot.mp3");
-
-    if (response.ok) {
-      buffer = await context.decodeAudioData(await response.arrayBuffer());
+      if (response.ok) {
+        bytes = await response.arrayBuffer();
+      }
+    } catch {
+      // Fichier absent ou illisible : la synthèse prendra le relais.
+      fetching = null;
     }
-  } catch {
-    // Fichier absent ou illisible : la synthèse prendra le relais.
-  }
+  })();
+
+  await fetching;
+
+  if (buffer || !context || !bytes) return;
+
+  decoding ??= (async () => {
+    try {
+      buffer = await context!.decodeAudioData(bytes!.slice(0));
+    } catch {
+      // Contexte encore suspendu, ou fichier illisible : on retentera.
+      decoding = null;
+    }
+  })();
+
+  await decoding;
 }
 
 export function fireGunshot(): void {

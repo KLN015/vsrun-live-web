@@ -2,7 +2,7 @@
 
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { scaled } from "@/lib/brand";
-import { fireGunshot } from "@/lib/gunshot";
+import { fireGunshot, primeGunshot } from "@/lib/gunshot";
 import type { Clock } from "@/lib/types";
 
 /** « 1:23.45 » — minutes omises tant qu'elles valent zéro, comme un chrono de piste. */
@@ -113,6 +113,12 @@ export function DisplayCountdown({ clock }: { clock: Clock }) {
 
       return;
     }
+
+    // Le son est préparé maintenant, pas au « Go » : le compte à rebours nous
+    // offre cinq secondes de préavis, et au moment du départ il ne reste plus
+    // le temps de télécharger ni de décoder quoi que ce soit. Sans cela, le
+    // premier départ d'une séance partait à la synthèse.
+    void primeGunshot();
 
     // Le rendu reprend la séquence là où elle en est : un écran allumé en
     // cours de compte à rebours ne repart pas du début.
