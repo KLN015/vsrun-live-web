@@ -1,3 +1,4 @@
+import type { ReactNode } from "react";
 import { AutoScroll } from "@/components/auto-scroll";
 import { BrandFontFaces } from "@/components/brand-faces";
 import { brandStyle, scaled, type Brand } from "@/lib/brand";
@@ -12,14 +13,12 @@ import {
 import { cn } from "@/lib/utils";
 
 /**
- * Rendu d'un écran de diffusion.
- *
- * Le même composant sert à l'écran réel et à l'aperçu du panneau de contrôle,
- * à l'échelle près : l'organisateur voit exactement ce que verra la tribune.
- * Deux rendus séparés divergeraient dès la première modification.
+ * Rendu d'un écran découpé en grille.
  *
  * Volontairement sans état et sans dépendance : il reçoit des zones résolues
- * et les dessine.
+ * et les dessine. Le découpage libre a son propre rendu (`FreeZone`) — sa zone
+ * porte sa place, sa taille et son habillage, ce qu'aucune case de grille ne
+ * fait.
  */
 export function DisplayCanvas({
   layout,
@@ -68,6 +67,99 @@ export function DisplayCanvas({
           <Zone zone={zone} compact={compact} />
         </div>
       ))}
+    </div>
+  );
+}
+
+/**
+ * L'unique zone d'un écran à découpage libre.
+ *
+ * Cette zone **est** l'écran : elle porte son habillage — logo, chronomètre —
+ * et confine tout ce qu'elle montre à son rectangle. Ce que l'organisateur
+ * place en (x, y) sur la toile délimite donc la totalité de ce que verra la
+ * tribune, visuels compris.
+ *
+ * C'est la différence avec une case de grille, qui ne connaît ni sa place ni
+ * l'habillage posé au-dessus d'elle : le découpage libre a son rendu propre
+ * plutôt qu'un `if` de plus dans DisplayCanvas.
+ */
+export function FreeZone({
+  zone,
+  canvas,
+  brand,
+  header,
+  image,
+  compact = false,
+}: {
+  zone?: RenderedZone;
+  /** La toile, repère des coordonnées de la zone. */
+  canvas: { width: number; height: number };
+  brand?: Brand;
+  /** L'habillage, rendu au sommet de la zone. */
+  header?: ReactNode;
+  /** Un visuel affiché : il prend la place du contenu, dans la même zone. */
+  image?: { url: string } | null;
+  compact?: boolean;
+}) {
+  // Une zone jamais placée occupe toute la toile. Un écran fraîchement créé
+  // doit montrer son logo, pas une surface noire dont rien ne dit qu'elle
+  // fonctionne.
+  const geometry = zone?.geometry ?? {
+    x: 0,
+    y: 0,
+    width: canvas.width,
+    height: canvas.height,
+  };
+
+  const frame = {
+    position: "absolute" as const,
+    left: geometry.x,
+    top: geometry.y,
+    width: geometry.width,
+    height: geometry.height,
+    backgroundColor: brand
+      ? "color-mix(in srgb, var(--brand-text) 6%, var(--brand-background))"
+      : undefined,
+  };
+
+  // Un visuel prend la zone entière : ni habillage, ni marge. Une affiche, un
+  // carton de départ, une photo de podium se lisent en grand ou ne se lisent
+  // pas ; le logo posé au-dessus ne faisait que rogner la seule chose qu'on
+  // est venu regarder — et il reparaît dès que le visuel se retire.
+  //
+  // `object-contain` reste la règle à l'intérieur de ce rectangle : le
+  // rogner couperait le texte d'une affiche.
+  if (image) {
+    return (
+      <div
+        style={frame}
+        className={cn(
+          "overflow-hidden rounded-md",
+          brand ? "" : "bg-neutral-900",
+        )}
+      >
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img src={image.url} alt="" className="h-full w-full object-contain" />
+      </div>
+    );
+  }
+
+  return (
+    <div
+      style={frame}
+      className={cn(
+        "flex flex-col overflow-hidden rounded-md",
+        compact ? "gap-1 p-1.5" : "gap-4 p-6",
+        brand ? "" : "bg-neutral-900",
+      )}
+    >
+      {header}
+
+      <div className="min-h-0 flex-1">
+        {zone && zone.content_type !== "empty" ? (
+          <Zone zone={zone} compact={compact} />
+        ) : null}
+      </div>
     </div>
   );
 }

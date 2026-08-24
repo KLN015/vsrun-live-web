@@ -693,7 +693,10 @@ export async function updateDisplayLayout(
   const result = await send(
     `/displays/${displayId}`,
     {
-      ...json({ name: text(form, "name"), layout: text(form, "layout") }),
+      ...json({
+        name: text(form, "name"),
+        layout: text(form, "layout"),
+      }),
       method: "PATCH",
     },
     back,
@@ -720,6 +723,10 @@ export async function updateDisplayZones(
   const back = text(form, "back") ?? "/dashboard";
   const zoneCount = Number(text(form, "zone_count") ?? 1);
 
+  // Le découpage libre est le seul où la zone porte sa place ; ailleurs, l'API
+  // refuse ces champs plutôt que de laisser des coordonnées sans effet en base.
+  const free = text(form, "layout") === "free";
+
   const zones = Array.from({ length: zoneCount }, (_, index) => {
     const position = index + 1;
     const contentType = text(form, `zone_${position}_content_type`) ?? "empty";
@@ -741,7 +748,16 @@ export async function updateDisplayZones(
       if (limit) config.limit = Number(limit);
     }
 
-    return { position, content_type: contentType, config };
+    const geometry = free
+      ? {
+          x: Number(text(form, `zone_${position}_x`) ?? 0),
+          y: Number(text(form, `zone_${position}_y`) ?? 0),
+          width: Number(text(form, `zone_${position}_width`) ?? 0),
+          height: Number(text(form, `zone_${position}_height`) ?? 0),
+        }
+      : {};
+
+    return { position, content_type: contentType, config, ...geometry };
   });
 
   const result = await send(
@@ -755,6 +771,67 @@ export async function updateDisplayZones(
   revalidatePath(back);
 
   return { success: "Configuration envoyée aux écrans." };
+}
+
+// ------------------------------------------------------- visuels d'écran
+
+/**
+ * Dépose un visuel pour l'événement.
+ *
+ * En multipart, comme les chartes : JSON ne sait pas porter un fichier.
+ */
+export async function uploadEventImage(
+  _state: ActionState,
+  form: FormData,
+): Promise<ActionState> {
+  const eventId = text(form, "event_id");
+  const back = text(form, "back") ?? "/dashboard";
+
+  const result = await send(
+    `/events/${eventId}/images`,
+    { method: "POST", body: mediaPayload(form, ["event_id", "back"]) },
+    back,
+  );
+
+  if (result.error) return result;
+
+  revalidatePath(back);
+
+  return { success: "Visuel enregistré." };
+}
+
+export async function deleteEventImage(form: FormData): Promise<void> {
+  const imageId = text(form, "image_id");
+  const back = text(form, "back") ?? "/dashboard";
+
+  await send(`/images/${imageId}`, { method: "DELETE" }, back);
+  revalidatePath(back);
+}
+
+/**
+ * Met un visuel à l'écran, ou l'en retire.
+ *
+ * Un seul geste, sans passer par la configuration des zones : c'est le propre
+ * de cette fonction — on l'utilise pendant la compétition, entre deux séries,
+ * et le carton doit apparaître au clic.
+ *
+ * `image_id` vide signifie « retirer » : le même formulaire sert donc au
+ * bouton de chaque visuel et à celui qui rend l'écran à sa composition.
+ */
+export async function showDisplayImage(form: FormData): Promise<void> {
+  const displayId = text(form, "display_id");
+  const imageId = text(form, "image_id");
+  const back = text(form, "back") ?? "/dashboard";
+
+  await send(
+    `/displays/${displayId}/image`,
+    imageId
+      ? { ...json({ image_id: imageId }), method: "PUT" }
+      : { method: "DELETE" },
+    back,
+  );
+
+  revalidatePath(back);
 }
 
 export async function rotateDisplayToken(form: FormData): Promise<void> {

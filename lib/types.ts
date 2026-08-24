@@ -384,7 +384,7 @@ export type ManagedVideo = {
 
 /* ----------------------------------------------------------------- écrans */
 
-export type DisplayLayout = "1" | "2h" | "2v" | "3" | "4";
+export type DisplayLayout = "1" | "2h" | "2v" | "3" | "4" | "free";
 export type DisplayContentType =
   | "discipline"
   | "latest_results"
@@ -399,11 +399,35 @@ export type DisplayZoneConfig = {
   muted?: boolean;
 };
 
+/**
+ * Position et taille d'une zone, en pixels sur la toile de l'écran.
+ *
+ * Nulle hors découpage libre : c'est alors la grille qui place les zones.
+ */
+export type ZoneGeometry = {
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+};
+
+/** Un visuel prédéfini de l'événement. */
+export type EventImage = {
+  id: string;
+  event_id: string;
+  name: string;
+  url: string;
+  width: number;
+  height: number;
+  created_at: string | null;
+};
+
 export type DisplayZone = {
   position: number;
   content_type: DisplayContentType;
   content_type_label: string;
   config: DisplayZoneConfig;
+  geometry: ZoneGeometry | null;
 };
 
 export type Display = {
@@ -412,7 +436,10 @@ export type Display = {
   name: string;
   layout: DisplayLayout;
   layout_label: string;
+  canvas: { width: number; height: number };
   zone_count: number;
+  /** Le visuel affiché à cet instant — il masque alors la composition. */
+  image: EventImage | null;
   public_token: string;
   is_connected: boolean;
   last_seen_at: string | null;
@@ -425,6 +452,7 @@ export type RenderedZone = {
   position: number;
   content_type: DisplayContentType;
   config: DisplayZoneConfig;
+  geometry: ZoneGeometry | null;
   content:
     | { discipline: PublicDiscipline; results: PublicResult[] }
     | { results: PublicResult[] }
@@ -436,9 +464,18 @@ export type RenderedDisplay = {
   id: string;
   name: string;
   layout: DisplayLayout;
+  /** La toile de composition du découpage libre, en pixels. */
+  canvas: { width: number; height: number };
   event: { name: string; status: EventStatus };
   brand: Brand;
   zones: RenderedZone[];
+  /**
+   * Le visuel qui prend toute la place, s'il y en a un.
+   *
+   * Tant qu'il est là, la composition n'est pas rendue : c'est ce qu'on attend
+   * d'un carton « Qualifications » — pas une vignette dans un coin.
+   */
+  image: { url: string; width: number; height: number } | null;
   clock: Clock;
 };
 
@@ -468,6 +505,7 @@ export const DISPLAY_LAYOUT_LABELS: Record<DisplayLayout, string> = {
   "2v": "Deux colonnes",
   "3": "Trois zones",
   "4": "Quatre zones",
+  free: "Libre",
 };
 
 export const DISPLAY_CONTENT_LABELS: Record<DisplayContentType, string> = {
@@ -490,6 +528,8 @@ export const DISPLAY_LAYOUT_GRID: Record<DisplayLayout, string> = {
   "2v": "grid-cols-2 grid-rows-1",
   "3": "grid-cols-2 grid-rows-2",
   "4": "grid-cols-2 grid-rows-2",
+  // Le découpage libre n'est pas une grille : chaque zone se place elle-même.
+  free: "",
 };
 
 /** En layout « 3 », la première zone occupe toute la hauteur de gauche. */

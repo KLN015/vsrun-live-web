@@ -54,12 +54,12 @@ export function VsrunLogo({
 }
 
 /**
- * La pastille LIVE, séparément du logo.
+ * La pastille LIVE, qui accompagne le logo VSRUN.
  *
- * Un écran qui porte le logo d'un organisateur garde cette pastille : elle ne
- * dit pas qui diffuse, elle dit que ça se passe maintenant.
+ * Elle fait partie de ce dessin-là et de nul autre : un écran qui porte le logo
+ * d'un organisateur l'affiche seul, sans pastille étrangère accolée.
  */
-export function LiveBadge({
+function LiveBadge({
   live,
   color = "var(--brand-accent, var(--vsrun-orange))",
 }: {

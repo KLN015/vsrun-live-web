@@ -1,10 +1,11 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
-import { DisplayCanvas } from "@/components/display-canvas";
+import { DisplayCanvas, FreeZone } from "@/components/display-canvas";
 import { DisplayChrome } from "@/components/display-chrome";
 import { DisplayClock, DisplayCountdown } from "@/components/display-clock";
 import { DisplayControls } from "@/components/display-controls";
+import { FreeCanvas } from "@/components/free-canvas";
 import { BrandFontFaces } from "@/components/brand-faces";
 import { brandStyle } from "@/lib/brand";
 import { displayEcho } from "@/lib/echo";
@@ -107,30 +108,98 @@ export function LiveDisplay({
   // résultats reprennent tout l'écran.
   const showsClock = clock.running || clock.elapsed_ms > 0;
 
-  return (
-    <div
-      className="flex h-full w-full flex-col gap-4 p-6"
-      style={{
-        ...brandStyle(display.brand),
-        color: "var(--brand-text)",
-        fontFamily: "var(--brand-font-body)",
-        // Dégradé repris du prototype : une lueur haute aux couleurs de
-        // l'organisateur, sur un fond qui s'assombrit vers le bas.
-        background: `
-          radial-gradient(1200px 600px at 50% -12%, color-mix(in srgb, var(--brand-accent) 22%, transparent), transparent 62%),
-          linear-gradient(180deg, var(--brand-background) 0%, color-mix(in srgb, var(--brand-background) 82%, #000) 100%)
-        `,
-      }}
-    >
-      <BrandFontFaces brand={display.brand} />
+  // En découpage libre, la page **entière** est une toile de dimensions
+  // connues, mise à l'échelle d'un seul tenant : logo, chronomètre et listes
+  // de résultats grandissent ensemble. Les autres découpages restent fluides
+  // et s'adaptent à la surface qu'on leur donne.
+  const free = display.layout === "free";
 
+  const surface = {
+    ...brandStyle(display.brand),
+    color: "var(--brand-text)",
+    fontFamily: "var(--brand-font-body)",
+    // Dégradé repris du prototype : une lueur haute aux couleurs de
+    // l'organisateur, sur un fond qui s'assombrit vers le bas.
+    background: `
+      radial-gradient(1200px 600px at 50% -12%, color-mix(in srgb, var(--brand-accent) 22%, transparent), transparent 62%),
+      linear-gradient(180deg, var(--brand-background) 0%, color-mix(in srgb, var(--brand-background) 82%, #000) 100%)
+    `,
+  };
+
+  const chrome = (
+    <>
       <DisplayChrome
-        eventName={display.event.name}
         live={display.event.status === "live"}
         logoUrl={display.brand.logo_url}
       />
 
       {showsClock ? <DisplayClock clock={clock} /> : null}
+    </>
+  );
+
+  const overlays = (
+    <>
+      <DisplayCountdown clock={clock} />
+      <DisplayControls />
+    </>
+  );
+
+  if (free) {
+    return (
+      <div className="h-full w-full" style={surface}>
+        <BrandFontFaces brand={display.brand} />
+
+        {/* La toile est l'écran entier ; la zone y délimite tout ce qui
+            s'affiche. Son rectangle porte l'habillage comme le contenu : rien
+            ne déborde de ce que l'organisateur a placé. */}
+        <FreeCanvas
+          width={display.canvas.width}
+          height={display.canvas.height}
+        >
+          <div className="relative h-full w-full">
+            <FreeZone
+              zone={display.zones[0]}
+              canvas={display.canvas}
+              brand={display.brand}
+              header={chrome}
+              image={display.image}
+            />
+          </div>
+        </FreeCanvas>
+
+        {/* Hors de la toile : ces deux-là couvrent l'écran réel, pas la
+            composition. Le compte à rebours se dimensionne déjà lui-même. */}
+        {overlays}
+      </div>
+    );
+  }
+
+  // Un visuel affiché remplace toute la composition, habillage compris : en
+  // grille il n'y a pas de zone unique où le confiner, et une affiche coincée
+  // sous un bandeau ne dit plus rien de lisible depuis une tribune. Même
+  // règle qu'en découpage libre — l'écran entier, bord à bord.
+  if (display.image) {
+    return (
+      <div className="h-full w-full" style={surface}>
+        <BrandFontFaces brand={display.brand} />
+
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img
+          src={display.image.url}
+          alt=""
+          className="h-full w-full object-contain"
+        />
+
+        {overlays}
+      </div>
+    );
+  }
+
+  return (
+    <div className="flex h-full w-full flex-col gap-4 p-6" style={surface}>
+      <BrandFontFaces brand={display.brand} />
+
+      {chrome}
 
       <div className="min-h-0 flex-1">
         <DisplayCanvas
@@ -140,9 +209,7 @@ export function LiveDisplay({
         />
       </div>
 
-      <DisplayCountdown clock={clock} />
-
-      <DisplayControls />
+      {overlays}
     </div>
   );
 }
