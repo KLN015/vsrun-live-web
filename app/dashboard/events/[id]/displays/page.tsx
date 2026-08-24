@@ -241,10 +241,10 @@ function DisplayPanel({
         <div>
           <p className="mb-1 text-sm font-medium">Chronomètre</p>
           <p className="text-muted-foreground mb-2 text-xs">
-            Propre à cet écran. Le compte à rebours annonce « À vos marques »,
-            « Prêt », puis lance le chronomètre au « Go » — le son du départ
-            demande un premier clic sur la page de l&apos;écran, que les
-            navigateurs exigent avant tout audio.
+            Propre à cet écran. Le compte à rebours décompte 3, 2, 1, puis
+            lance le chronomètre au « GO » — le son du départ demande un premier
+            clic sur la page de l&apos;écran, que les navigateurs exigent avant
+            tout audio.
           </p>
           <ClockControls
             displayId={display.id}

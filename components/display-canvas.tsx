@@ -9,6 +9,7 @@ import {
   type PublicResult,
   type PublicVideo,
   type RenderedZone,
+  type ZoneGeometry,
 } from "@/lib/types";
 import { cn } from "@/lib/utils";
 
@@ -72,6 +73,25 @@ export function DisplayCanvas({
 }
 
 /**
+ * Le rectangle qu'occupe la zone d'un écran à découpage libre.
+ *
+ * Une zone jamais placée occupe toute la toile. Un écran fraîchement créé doit
+ * montrer son logo, pas une surface noire dont rien ne dit qu'elle fonctionne.
+ *
+ * Partagé, parce que la zone n'est plus seule à connaître ce rectangle : le
+ * compte à rebours s'y centre. Deux calculs de la même chose divergeraient au
+ * premier changement, et le décompte se décalerait de la composition.
+ */
+export function freeGeometry(
+  zone: RenderedZone | undefined,
+  canvas: { width: number; height: number },
+): ZoneGeometry {
+  return (
+    zone?.geometry ?? { x: 0, y: 0, width: canvas.width, height: canvas.height }
+  );
+}
+
+/**
  * L'unique zone d'un écran à découpage libre.
  *
  * Cette zone **est** l'écran : elle porte son habillage — logo, chronomètre —
@@ -101,15 +121,7 @@ export function FreeZone({
   image?: { url: string } | null;
   compact?: boolean;
 }) {
-  // Une zone jamais placée occupe toute la toile. Un écran fraîchement créé
-  // doit montrer son logo, pas une surface noire dont rien ne dit qu'elle
-  // fonctionne.
-  const geometry = zone?.geometry ?? {
-    x: 0,
-    y: 0,
-    width: canvas.width,
-    height: canvas.height,
-  };
+  const geometry = freeGeometry(zone, canvas);
 
   const frame = {
     position: "absolute" as const,

@@ -100,7 +100,10 @@ export function ClockControls({
         <form action={driveClock}>
           {hidden}
           <input type="hidden" name="clock_action" value="countdown" />
-          <input type="hidden" name="go_ms" value={5000} />
+          {/* Trois secondes : la durée du décompte *est* ce que la tribune
+              voit — 3, 2, 1, GO. En allonger une seule ajoute un chiffre à
+              l'écran. */}
+          <input type="hidden" name="go_ms" value={3000} />
           <Button size="sm" type="submit">
             Compte à rebours
           </Button>

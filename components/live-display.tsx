@@ -1,7 +1,11 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
-import { DisplayCanvas, FreeZone } from "@/components/display-canvas";
+import {
+  DisplayCanvas,
+  FreeZone,
+  freeGeometry,
+} from "@/components/display-canvas";
 import { DisplayChrome } from "@/components/display-chrome";
 import { DisplayClock, DisplayCountdown } from "@/components/display-clock";
 import { DisplayControls } from "@/components/display-controls";
@@ -145,6 +149,8 @@ export function LiveDisplay({
   );
 
   if (free) {
+    const geometry = freeGeometry(display.zones[0], display.canvas);
+
     return (
       <div className="h-full w-full" style={surface}>
         <BrandFontFaces brand={display.brand} />
@@ -164,12 +170,29 @@ export function LiveDisplay({
               header={chrome}
               image={display.image}
             />
+
+            {/* Le compte à rebours appartient à la composition, pas à l'écran :
+                il couvre le rectangle de la zone et s'y centre. Une zone posée
+                dans un coin d'un mur garde son décompte au même endroit que ses
+                résultats — le chercher ailleurs n'aurait aucun sens pour qui
+                regarde. */}
+            <div
+              className="absolute"
+              style={{
+                left: geometry.x,
+                top: geometry.y,
+                width: geometry.width,
+                height: geometry.height,
+              }}
+            >
+              <DisplayCountdown clock={clock} />
+            </div>
           </div>
         </FreeCanvas>
 
-        {/* Hors de la toile : ces deux-là couvrent l'écran réel, pas la
-            composition. Le compte à rebours se dimensionne déjà lui-même. */}
-        {overlays}
+        {/* Hors de la toile : les commandes s'adressent au régisseur devant la
+            machine, pas à la tribune. Leur place est le coin de l'écran réel. */}
+        <DisplayControls />
       </div>
     );
   }
@@ -180,7 +203,7 @@ export function LiveDisplay({
   // règle qu'en découpage libre — l'écran entier, bord à bord.
   if (display.image) {
     return (
-      <div className="h-full w-full" style={surface}>
+      <div className="relative h-full w-full" style={surface}>
         <BrandFontFaces brand={display.brand} />
 
         {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -196,7 +219,10 @@ export function LiveDisplay({
   }
 
   return (
-    <div className="flex h-full w-full flex-col gap-4 p-6" style={surface}>
+    <div
+      className="relative flex h-full w-full flex-col gap-4 p-6"
+      style={surface}
+    >
       <BrandFontFaces brand={display.brand} />
 
       {chrome}

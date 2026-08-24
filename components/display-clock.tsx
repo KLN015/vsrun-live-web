@@ -88,20 +88,34 @@ export function DisplayClock({ clock }: { clock: Clock }) {
 }
 
 /**
- * Le compte à rebours du départ, en plein écran.
+ * Le compte à rebours du départ.
+ *
+ * Un décompte de secondes — 3, 2, 1 — puis « GO ». Le chiffre est ce que tout
+ * le monde sait lire de loin et dans n'importe quelle langue, là où une phrase
+ * demande d'être lue en entier avant de dire quelque chose.
+ *
+ * Il couvre la surface qu'on lui donne : l'écran entier en grille, le
+ * rectangle de la zone en découpage libre. C'est l'appelant qui le place.
  *
  * La séquence est rejouée par l'écran à partir de l'instant où elle a été
  * lancée, et non pilotée pas à pas depuis le serveur : plusieurs écrans
- * affichent ainsi « Prêt » à la même milliseconde, même si l'un d'eux a reçu le
- * message avec du retard.
+ * affichent ainsi le même chiffre à la même milliseconde, même si l'un d'eux a
+ * reçu le message avec du retard.
  *
  * Le coup de feu part d'ici, au passage du « Go », sans rien demander à
  * personne. Encore faut-il que le navigateur l'autorise : c'est le rôle de
  * DisplayControls, qui réclame le geste unique dont il a besoin — et le signale
  * tant qu'il ne l'a pas obtenu.
  */
+/** Le dernier mot de la séquence ; tout le reste est un chiffre. */
+const GO = "GO";
+
 export function DisplayCountdown({ clock }: { clock: Clock }) {
-  const [phase, setPhase] = useState<"marks" | "set" | "go" | null>(null);
+  // Un texte et non une phase nommée : la séquence n'a plus trois états mais
+  // autant que le compte à rebours dure de secondes. Une chaîne reste une
+  // valeur primitive — la boucle peut la réécrire à chaque image sans
+  // provoquer de rendu tant qu'elle ne change pas.
+  const [label, setLabel] = useState<string | null>(null);
   const frame = useRef<number | null>(null);
   const fired = useRef(false);
 
@@ -109,7 +123,7 @@ export function DisplayCountdown({ clock }: { clock: Clock }) {
 
   useEffect(() => {
     if (!countdown) {
-      setPhase(null);
+      setLabel(null);
 
       return;
     }
@@ -133,18 +147,21 @@ export function DisplayCountdown({ clock }: { clock: Clock }) {
     const tick = () => {
       const elapsed = performance.now() - anchor;
 
-      if (elapsed < goMs / 2) setPhase("marks");
-      else if (elapsed < goMs) setPhase("set");
-      else if (elapsed < goMs + FLASH_MS) {
-        setPhase("go");
+      if (elapsed < goMs) {
+        // La seconde en cours d'écoulement, arrondie par le haut : à 2,4 s du
+        // départ on est dans la troisième seconde, on affiche 3. Le chiffre
+        // change donc sur la seconde pleine, et le « 1 » cède la place au coup
+        // de feu, jamais avant.
+        setLabel(String(Math.ceil((goMs - elapsed) / 1000)));
+      } else if (elapsed < goMs + FLASH_MS) {
+        setLabel(GO);
 
         if (!fired.current) {
           fired.current = true;
           fireGunshot();
         }
-      }
-      else {
-        setPhase(null);
+      } else {
+        setLabel(null);
 
         return;
       }
@@ -159,26 +176,32 @@ export function DisplayCountdown({ clock }: { clock: Clock }) {
     };
   }, [countdown]);
 
-  if (phase === null) return null;
+  if (label === null) return null;
 
-  const labels = { marks: "À vos marques", set: "Prêt", go: "Go" } as const;
+  const go = label === GO;
 
   return (
+    // `absolute` et non `fixed` : le compte à rebours couvre le bloc qui le
+    // porte. En grille c'est l'écran, en découpage libre la zone — et il s'y
+    // centre, au lieu de se centrer sur un mur dont la composition n'occupe
+    // qu'un coin.
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center"
+      className="absolute inset-0 z-50 flex items-center justify-center"
       style={{
-        background:
-          phase === "go" ? "var(--brand-accent)" : "var(--brand-background)",
+        background: go ? "var(--brand-accent)" : "var(--brand-background)",
       }}
     >
+      {/* `tabular-nums` : sans lui le « 1 », plus étroit que les autres
+          chiffres, serait grossi davantage pour remplir la même largeur — le
+          décompte sauterait d'une taille à l'autre. */}
       <FittedText
-        className="px-8 text-center leading-none font-extrabold tracking-widest uppercase"
+        className="px-8 text-center leading-none font-extrabold tracking-widest tabular-nums uppercase"
         style={{
-          color: phase === "go" ? "#0a0a0a" : "var(--brand-text)",
+          color: go ? "#0a0a0a" : "var(--brand-text)",
           fontFamily: "var(--brand-font-heading)",
         }}
       >
-        {labels[phase]}
+        {label}
       </FittedText>
     </div>
   );
@@ -191,12 +214,11 @@ const PROBE_SIZE = 100;
 const FILL = 0.92;
 
 /**
- * Un texte porté à la plus grande taille qui tienne dans l'écran.
+ * Un texte porté à la plus grande taille qui tienne dans le bloc qui le porte.
  *
- * Trois phrases se succèdent ici — « À vos marques », « Prêt », « Go » — et
- * leurs longueurs n'ont rien à voir. Une taille unique ne peut pas les servir :
- * réglée pour la plus longue, « Go » reste petit au moment qui compte ; réglée
- * pour « Go », la première déborde de l'écran.
+ * Deux formes se succèdent ici — un chiffre, puis « GO » — et leurs largeurs
+ * n'ont rien à voir. Une taille unique ne peut pas les servir : réglée pour
+ * « GO », le chiffre reste petit ; réglée pour le chiffre, « GO » déborde.
  *
  * D'où la mesure plutôt qu'un calcul : on rend le texte à une taille connue, on
  * regarde la place qu'il prend, et on en déduit le facteur en une fois — les
@@ -204,9 +226,15 @@ const FILL = 0.92;
  * sur la largeur des lettres, ce qui compte depuis qu'un organisateur peut
  * déposer sa propre police : ses métriques nous sont inconnues.
  *
- * La mesure est refaite quand la police arrive, quand la fenêtre change, et à
- * chaque phrase. `useLayoutEffect` la place avant l'affichage : on ne voit
- * jamais le texte à la taille d'essai.
+ * La référence est le parent, jamais la fenêtre : en découpage libre, le
+ * compte à rebours tient dans le rectangle de la zone, qui n'a ni la taille ni
+ * les proportions de l'écran. Le parent est aussi mis à l'échelle par la
+ * toile, mais les deux mesures se font dans le même repère — le rapport, lui,
+ * ne dépend pas de l'échelle.
+ *
+ * La mesure est refaite quand la police arrive, quand le bloc change de taille,
+ * et à chaque valeur affichée. `useLayoutEffect` la place avant l'affichage :
+ * on ne voit jamais le texte à la taille d'essai.
  */
 function FittedText({
   children,
@@ -224,7 +252,15 @@ function FittedText({
 
     if (!element) return;
 
+    const host = element.parentElement;
+
+    if (!host) return;
+
     const fit = () => {
+      const box = host.getBoundingClientRect();
+
+      if (box.width === 0 || box.height === 0) return;
+
       element.style.fontSize = `${PROBE_SIZE}px`;
 
       const { width, height } = element.getBoundingClientRect();
@@ -232,8 +268,8 @@ function FittedText({
       if (width === 0 || height === 0) return;
 
       const factor = Math.min(
-        (window.innerWidth * FILL) / width,
-        (window.innerHeight * FILL) / height,
+        (box.width * FILL) / width,
+        (box.height * FILL) / height,
       );
 
       element.style.fontSize = `${PROBE_SIZE * factor}px`;
@@ -245,9 +281,13 @@ function FittedText({
     // mesure, la taille resterait celle calculée sur la police de repli.
     void document.fonts?.ready.then(fit);
 
-    window.addEventListener("resize", fit);
+    // Observer le bloc plutôt que la fenêtre couvre les deux cas d'un seul
+    // geste : la fenêtre redimensionnée change l'échelle de la toile, donc la
+    // taille du bloc.
+    const observer = new ResizeObserver(fit);
+    observer.observe(host);
 
-    return () => window.removeEventListener("resize", fit);
+    return () => observer.disconnect();
   }, [children]);
 
   return (
