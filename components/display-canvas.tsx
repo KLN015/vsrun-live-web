@@ -1,3 +1,4 @@
+import { AutoScroll } from "@/components/auto-scroll";
 import { BrandFontFaces } from "@/components/brand-faces";
 import { brandStyle, scaled, type Brand } from "@/lib/brand";
 import {
@@ -175,10 +176,14 @@ function ResultList({
   }
 
   return (
-    <ol className="min-h-0 flex-1 overflow-hidden">
-      {results.map((result) => (
+    <AutoScroll ids={results.map((result) => result.id)} enabled={!compact}>
+      <ol>
+        {results.map((result) => (
         <li
           key={result.id}
+          // Repère de la ligne, pour qu'un temps qui vient de tomber puisse
+          // être amené à l'écran.
+          data-row={result.id}
           className="flex items-baseline gap-3 border-b border-neutral-800 py-1 last:border-0"
           style={{ fontSize: scaled(compact ? "10px" : "2.1875rem", "body") }}
         >
@@ -207,7 +212,8 @@ function ResultList({
             {result.display_value}
           </span>
         </li>
-      ))}
-    </ol>
+        ))}
+      </ol>
+    </AutoScroll>
   );
 }

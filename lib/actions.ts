@@ -18,11 +18,29 @@ import { fromLocalInput } from "./datetime";
 
 export type ActionState = { error?: string; success?: string };
 
+/**
+ * Comme `send`, mais rend aussi le corps de la réponse.
+ *
+ * La plupart des mutations n'ont rien à en tirer : elles réussissent ou elles
+ * échouent. L'import fait exception — son résultat est un décompte, et le
+ * message affiché en dépend.
+ */
+async function sendForResult(
+  path: string,
+  init: RequestInit,
+  returnTo: string,
+): Promise<ActionState & { body?: unknown }> {
+  const state = await send(path, init, returnTo, (body) => body);
+
+  return state;
+}
+
 async function send(
   path: string,
   init: RequestInit,
   returnTo: string,
-): Promise<ActionState> {
+  capture?: (body: unknown) => unknown,
+): Promise<ActionState & { body?: unknown }> {
   let response: Response;
 
   try {
@@ -38,7 +56,14 @@ async function send(
   }
 
   if (response.ok) {
-    return {};
+    if (!capture) return {};
+
+    try {
+      return { body: capture(await response.json()) };
+    } catch {
+      // Réponse sans corps JSON : l'appelant s'en accommodera.
+      return {};
+    }
   }
 
   return { error: await describeFailure(response) };
@@ -347,6 +372,49 @@ export async function detachDiscipline(form: FormData): Promise<void> {
 
 // ---------------------------------------------------------------- participants
 
+/**
+ * Import d'une liste d'engagés depuis un tableur.
+ *
+ * Le fichier voyage en multipart, comme les logos : JSON ne sait pas porter un
+ * fichier. L'API répond par un décompte et la liste des lignes refusées — le
+ * message rend les deux, car un import à moitié réussi n'est ni un succès ni
+ * un échec, et le secrétariat doit savoir quoi corriger.
+ */
+export async function importParticipants(
+  _state: ActionState,
+  form: FormData,
+): Promise<ActionState> {
+  const eventId = text(form, "event_id");
+  const path = `/dashboard/events/${eventId}/participants`;
+
+  const response = await sendForResult(
+    `/events/${eventId}/participants/import`,
+    { method: "POST", body: mediaPayload(form, ["event_id"]) },
+    path,
+  );
+
+  if (response.error) return response;
+
+  const body = response.body as
+    | { imported?: number; rejected?: { line: number }[] }
+    | null;
+
+  const imported = body?.imported ?? 0;
+  const rejected = body?.rejected ?? [];
+
+  revalidatePath(path);
+
+  if (rejected.length > 0) {
+    const lines = rejected.map((row) => row.line).join(", ");
+
+    return {
+      success: `${imported} engagé(s) importé(s). Lignes non retenues : ${lines}.`,
+    };
+  }
+
+  return { success: `${imported} engagé(s) importé(s).` };
+}
+
 export async function createParticipant(
   _state: ActionState,
   form: FormData,
@@ -396,6 +464,21 @@ export async function updateParticipant(form: FormData): Promise<void> {
     back,
   );
 
+  revalidatePath(back);
+}
+
+/**
+ * Suppression d'un engagé.
+ *
+ * Ses résultats déjà enregistrés survivent, détachés : effacer un concurrent
+ * n'efface pas des performances validées. C'est le serveur qui en décide, pas
+ * cette action.
+ */
+export async function deleteParticipant(form: FormData): Promise<void> {
+  const participantId = text(form, "participant_id");
+  const back = text(form, "back") ?? "/dashboard";
+
+  await send(`/participants/${participantId}`, { method: "DELETE" }, back);
   revalidatePath(back);
 }
 

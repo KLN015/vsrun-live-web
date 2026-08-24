@@ -12,7 +12,12 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { Button } from "@/components/ui/button";
-import { createParticipant, updateParticipant } from "@/lib/actions";
+import {
+  createParticipant,
+  deleteParticipant,
+  importParticipants,
+  updateParticipant,
+} from "@/lib/actions";
 import { apiJson } from "@/lib/api";
 import { withSession } from "@/lib/guard";
 import {
@@ -36,7 +41,32 @@ export default async function ParticipantsPage({
 
   return (
     <div className="space-y-4">
-      <div className="flex justify-end">
+      <div className="flex flex-wrap justify-end gap-2">
+        <FormDialog
+          trigger="Importer une liste"
+          variant="outline"
+          title="Importer une liste d'engagés"
+          description="Le fichier tel qu'il sort de votre tableur. Les lignes qui poseraient problème sont signalées, les autres sont importées."
+          submitLabel="Importer"
+          action={importParticipants}
+        >
+          <input type="hidden" name="event_id" value={id} />
+
+          <Field
+            label="Fichier"
+            htmlFor="participants-file"
+            hint="CSV ou Excel, 5 Mo au plus. Colonnes reconnues : dossard, nom, prénom, club, catégorie, sexe, pays — accents et majuscules indifférents. Un dossard déjà engagé n'est pas ajouté deux fois."
+          >
+            <Input
+              id="participants-file"
+              type="file"
+              name="file"
+              required
+              accept=".csv,.xlsx,.txt,text/csv,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+            />
+          </Field>
+        </FormDialog>
+
         <FormDialog
           trigger="Ajouter un participant"
           title="Ajouter un participant"
@@ -207,14 +237,35 @@ export default async function ParticipantsPage({
                           />
                         </TableCell>
                         <TableCell className="text-right">
-                          <Button
-                            form={formId}
-                            variant="outline"
-                            size="sm"
-                            type="submit"
-                          >
-                            Enregistrer
-                          </Button>
+                          <div className="flex justify-end gap-2">
+                            <Button
+                              form={formId}
+                              variant="outline"
+                              size="sm"
+                              type="submit"
+                            >
+                              Enregistrer
+                            </Button>
+
+                            {/* Formulaire séparé : celui de la ligne sert à
+                                l'enregistrement, et deux actions ne peuvent
+                                pas partager le même. */}
+                            <form action={deleteParticipant}>
+                              <input
+                                type="hidden"
+                                name="participant_id"
+                                value={participant.id}
+                              />
+                              <input type="hidden" name="back" value={path} />
+                              <Button
+                                variant="destructive"
+                                size="sm"
+                                type="submit"
+                              >
+                                Supprimer
+                              </Button>
+                            </form>
+                          </div>
                         </TableCell>
                       </TableRow>
                     );

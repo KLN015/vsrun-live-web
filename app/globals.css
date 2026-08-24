@@ -153,3 +153,25 @@
     transform: scale(0.7);
   }
 }
+
+/* La ligne qui vient d'arriver sur un écran de diffusion.
+   
+   Elle s'annonce, puis s'efface : une surbrillance permanente laisserait une
+   traînée de marques sur toute la série, et plus rien ne signalerait la
+   suivante. Le fond tient trois secondes pleines — le temps de lever les yeux
+   depuis la piste — avant de se dissoudre.
+   
+   La couleur vient de la charte de l'organisateur, comme le reste de l'écran. */
+@keyframes vsrun-fresh-row {
+  0%,
+  30% {
+    background-color: color-mix(in srgb, var(--brand-accent) 40%, transparent);
+  }
+  100% {
+    background-color: transparent;
+  }
+}
+
+[data-fresh] {
+  animation: vsrun-fresh-row 9s ease-out forwards;
+}
