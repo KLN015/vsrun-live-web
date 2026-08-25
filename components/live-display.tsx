@@ -108,6 +108,31 @@ export function LiveDisplay({
     return () => clearInterval(timer);
   }, [refresh]);
 
+  // Une emote se retire d'elle-même au bout de sa durée.
+  //
+  // Le décompte part d'ici, du moment où l'écran l'affiche, et non de l'instant
+  // où l'organisateur a cliqué : entre les deux il y a un message à diffuser et
+  // une configuration à redemander, et cette seconde-là serait prise sur les
+  // trois qu'il a demandées. Le rafraîchissement qui suit remet l'écran
+  // d'accord avec le serveur — il retrouve ce qu'il montrait avant l'emote.
+  const duration = display.image?.duration_ms ?? null;
+  const [expired, setExpired] = useState(false);
+
+  useEffect(() => {
+    setExpired(false);
+
+    if (duration === null) return;
+
+    const timer = setTimeout(() => {
+      setExpired(true);
+      void refresh();
+    }, duration);
+
+    return () => clearTimeout(timer);
+  }, [duration, display.image?.url, refresh]);
+
+  const image = expired ? null : display.image;
+
   // Le chronomètre n'occupe la hauteur que lorsqu'il sert : hors course, les
   // résultats reprennent tout l'écran.
   const showsClock = clock.running || clock.elapsed_ms > 0;
@@ -168,7 +193,7 @@ export function LiveDisplay({
               canvas={display.canvas}
               brand={display.brand}
               header={chrome}
-              image={display.image}
+              image={image}
             />
 
             {/* Le compte à rebours appartient à la composition, pas à l'écran :
@@ -201,14 +226,14 @@ export function LiveDisplay({
   // grille il n'y a pas de zone unique où le confiner, et une affiche coincée
   // sous un bandeau ne dit plus rien de lisible depuis une tribune. Même
   // règle qu'en découpage libre — l'écran entier, bord à bord.
-  if (display.image) {
+  if (image) {
     return (
       <div className="relative h-full w-full" style={surface}>
         <BrandFontFaces brand={display.brand} />
 
         {/* eslint-disable-next-line @next/next/no-img-element */}
         <img
-          src={display.image.url}
+          src={image.url}
           alt=""
           className="h-full w-full object-contain"
         />

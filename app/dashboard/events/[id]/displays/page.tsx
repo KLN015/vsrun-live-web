@@ -5,6 +5,7 @@ import { FormDialog } from "@/components/form-dialog";
 import { DisplayZoneEditor } from "@/components/display-zone-editor";
 import {
   DisplayImagePicker,
+  EventEmote,
   EventImageLibrary,
 } from "@/components/display-images";
 import { FormSelect } from "@/components/form-select";
@@ -33,9 +34,11 @@ import {
   type Display,
   type DisplayLayout,
   type EventImage,
+  type LiveEvent,
   type ZoneGeometry,
   type ManagedVideo,
   type Paginated,
+  type Wrapped,
 } from "@/lib/types";
 
 export default async function DisplaysPage({
@@ -46,14 +49,17 @@ export default async function DisplaysPage({
   const { id } = await params;
   const path = `/dashboard/events/${id}/displays`;
 
-  const { displays, disciplines, videos, images } = await withSession(
+  const { displays, disciplines, videos, images, event } = await withSession(
     path,
     async () => {
-      const [displays, disciplines, videos, images] = await Promise.all([
+      // L'événement est chargé pour une seule chose : l'emote en cours. Elle
+      // n'appartient à aucun écran — c'est ce qui la distingue des visuels.
+      const [displays, disciplines, videos, images, event] = await Promise.all([
         apiJson<Paginated<Display>>(`/events/${id}/displays`),
         apiJson<Paginated<Discipline>>(`/events/${id}/disciplines`),
         apiJson<Paginated<ManagedVideo>>(`/events/${id}/videos`),
         apiJson<Paginated<EventImage>>(`/events/${id}/images`),
+        apiJson<Wrapped<LiveEvent>>(`/events/${id}`),
       ]);
 
       return {
@@ -61,9 +67,25 @@ export default async function DisplaysPage({
         disciplines: disciplines.data,
         videos: videos.data,
         images: images.data,
+        event: event.data,
       };
     },
   );
+
+  // Résolue depuis la bibliothèque déjà chargée : l'identifiant suffit, et
+  // l'API n'a pas à renvoyer deux fois le même visuel.
+  //
+  // Une emote échue ne s'affiche plus nulle part : la colonne la garde, mais
+  // les écrans ont cessé de la montrer, et le panneau de contrôle doit dire la
+  // même chose qu'eux. Cette page est rendue au chargement — une emote de trois
+  // secondes aura presque toujours expiré quand on la relit.
+  const expired =
+    event.emote_expires_at !== null &&
+    Date.parse(event.emote_expires_at) <= Date.now();
+
+  const emote = expired
+    ? null
+    : (images.find((image) => image.id === event.emote_image_id) ?? null);
 
   return (
     <div className="space-y-6">
@@ -101,6 +123,14 @@ export default async function DisplaysPage({
 
       <EventImageLibrary eventId={id} images={images} back={path} />
 
+      <EventEmote
+        eventId={id}
+        images={images}
+        active={emote}
+        duration={emote ? event.emote_duration_ms : null}
+        back={path}
+      />
+
       {displays.length === 0 ? (
         <EmptyState>
           Aucun écran. Créez-en un, puis ouvrez son adresse sur l&apos;ordinateur
@@ -114,6 +144,7 @@ export default async function DisplaysPage({
             disciplines={disciplines}
             videos={videos}
             images={images}
+            emote={emote}
             back={path}
           />
         ))
@@ -127,12 +158,15 @@ function DisplayPanel({
   disciplines,
   videos,
   images,
+  emote,
   back,
 }: {
   display: Display;
   disciplines: Discipline[];
   videos: ManagedVideo[];
   images: EventImage[];
+  /** L'emote en cours : ce que l'écran montre réellement, quoi qu'il ait choisi. */
+  emote: EventImage | null;
   back: string;
 }) {
   const zones = display.zones ?? [];
@@ -153,6 +187,12 @@ function DisplayPanel({
             <Badge variant={display.is_connected ? "default" : "secondary"}>
               {display.is_connected ? "Connecté" : "Hors ligne"}
             </Badge>
+
+            {/* Tant qu'une emote est lancée, le sélecteur ci-dessous ne dit
+                plus ce qui est à l'écran mais ce qu'il retrouvera. Sans ce
+                rappel, on cliquerait sur une vignette en se demandant pourquoi
+                rien ne change. */}
+            {emote ? <Badge variant="outline">Emote en cours</Badge> : null}
 
             {/* L'action existait déjà ; aucun formulaire ne l'appelait, un
                 écran restait donc figé sur le nom et la disposition choisis à

@@ -198,8 +198,13 @@ function Zone({ zone, compact }: { zone: RenderedZone; compact: boolean }) {
     );
   }
 
+  // Avant le premier chrono de la journée, une zone « Derniers résultats »
+  // arrive avec `discipline: null` — le champ est là, sa valeur non. Tester la
+  // présence de la clé suffisait à faire lire `.name` sur rien, et l'écran
+  // partait en erreur jusqu'à la première publication : exactement le moment
+  // où le public le regarde.
   const title =
-    "discipline" in zone.content
+    "discipline" in zone.content && zone.content.discipline !== null
       ? zone.content.discipline.name
       : "Derniers résultats";
 

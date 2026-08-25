@@ -224,6 +224,7 @@ export async function createEvent(
       end_at: fromLocalInput(text(form, "end_at")),
       visibility: text(form, "visibility") ?? "private",
       publication_mode: text(form, "publication_mode") ?? "manual",
+      attachment_mode: text(form, "attachment_mode") ?? "manual",
     }),
     "/dashboard/events/new",
   );
@@ -252,6 +253,7 @@ export async function updateEvent(
         visibility: text(form, "visibility"),
         status: text(form, "status"),
         publication_mode: text(form, "publication_mode"),
+        attachment_mode: text(form, "attachment_mode"),
         // Vide : l'événement retombe sur la charte par défaut de son
         // organisation.
         brand_id: text(form, "brand_id") || null,
@@ -827,6 +829,38 @@ export async function showDisplayImage(form: FormData): Promise<void> {
     `/displays/${displayId}/image`,
     imageId
       ? { ...json({ image_id: imageId }), method: "PUT" }
+      : { method: "DELETE" },
+    back,
+  );
+
+  revalidatePath(back);
+}
+
+/**
+ * Lance l'emote de l'événement, ou la retire.
+ *
+ * Le même formulaire pour les deux : un identifiant vide retire. C'est ce qui
+ * permet à la grille de vignettes de n'avoir qu'un seul geste — celle qui est
+ * à l'écran comme celle qui n'y est pas se cliquent pareil.
+ */
+export async function showEventEmote(form: FormData): Promise<void> {
+  const eventId = text(form, "event_id");
+  const imageId = text(form, "image_id");
+  const duration = text(form, "duration_ms");
+  const back = text(form, "back") ?? "/dashboard";
+
+  await send(
+    `/events/${eventId}/emote`,
+    imageId
+      ? {
+          // Durée vide : « jusqu'au retrait ». C'est l'absence de valeur qui
+          // porte le sens, pas un zéro — l'API distingue les deux.
+          ...json({
+            image_id: imageId,
+            duration_ms: duration ? Number(duration) : null,
+          }),
+          method: "PUT",
+        }
       : { method: "DELETE" },
     back,
   );

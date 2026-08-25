@@ -155,6 +155,20 @@ export default async function EventSettingsPage({
               ]}
             />
           </Field>
+
+          <Field
+            label="Rattachement des séries reçues"
+            hint="En automatique, une série reçue rejoint l'épreuve du programme qui porte le même nom. Deux épreuves homonymes : la série attend, personne ne peut trancher à votre place. Contrairement à la publication, l'activer rattache aussi les séries déjà en attente — et chaque rattachement reste défaisable."
+          >
+            <FormSelect
+              name="attachment_mode"
+              defaultValue={event.attachment_mode}
+              options={[
+                { value: "manual", label: "Manuel" },
+                { value: "auto", label: "Automatique" },
+              ]}
+            />
+          </Field>
         </ActionForm>
         </CardContent>
       </Card>

@@ -2,7 +2,7 @@
 
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { scaled } from "@/lib/brand";
-import { fireGunshot, primeGunshot } from "@/lib/gunshot";
+import { beep, fireGunshot, primeGunshot } from "@/lib/gunshot";
 import type { Clock } from "@/lib/types";
 
 /** « 1:23.45 » — minutes omises tant qu'elles valent zéro, comme un chrono de piste. */
@@ -119,10 +119,31 @@ export function DisplayCountdown({ clock }: { clock: Clock }) {
   const frame = useRef<number | null>(null);
   const fired = useRef(false);
 
+  // Le dernier chiffre annoncé à voix haute. La boucle réécrit le même libellé
+  // à chaque image ; sans ce repère, le bip partirait soixante fois par
+  // seconde au lieu d'une fois par chiffre.
+  const sounded = useRef<string | null>(null);
+
+  /**
+   * L'origine de la séquence en cours, posée une fois pour toutes.
+   *
+   * L'écran redemande sa configuration à chaque signal reçu, et en rapporte un
+   * chronomètre neuf : même compte à rebours, mais `elapsed_ms` recalculé par
+   * le serveur, donc une origine décalée du trajet du message. Recalée à chaque
+   * fois, la séquence sautait — un « 5 » de deux dixièmes au lieu d'une
+   * seconde, suivi d'un bip à contretemps.
+   *
+   * La clé est ce qui identifie *un* compte à rebours : son instant de départ
+   * et sa durée. Tant qu'elle ne change pas, l'origine ne bouge plus et les
+   * chiffres tiennent leur seconde. Un nouveau départ en pose une autre.
+   */
+  const sequence = useRef<{ key: string; anchor: number } | null>(null);
+
   const countdown = clock.countdown;
 
   useEffect(() => {
     if (!countdown) {
+      sequence.current = null;
       setLabel(null);
 
       return;
@@ -134,15 +155,47 @@ export function DisplayCountdown({ clock }: { clock: Clock }) {
     // premier départ d'une séance partait à la synthèse.
     void primeGunshot();
 
-    // Le rendu reprend la séquence là où elle en est : un écran allumé en
-    // cours de compte à rebours ne repart pas du début.
-    const anchor = performance.now() - countdown.elapsed_ms;
     const { go_ms: goMs } = countdown;
     const FLASH_MS = 2000;
+    const key = `${countdown.started_at}|${goMs}`;
 
-    // Un écran qui rejoint la séquence après le départ ne doit pas tirer un
-    // coup de feu en retard.
-    fired.current = countdown.elapsed_ms >= goMs;
+    // Tout ce qui suit n'appartient qu'au **premier** rendu d'une séquence.
+    // Les suivants ne font que reprendre la boucle là où elle en était.
+    if (sequence.current?.key !== key) {
+      // Le rendu reprend la séquence là où elle en est : un écran allumé en
+      // cours de compte à rebours ne repart pas du début.
+      sequence.current = { key, anchor: performance.now() - countdown.elapsed_ms };
+
+      // Un écran qui rejoint la séquence après le départ ne doit pas tirer un
+      // coup de feu en retard.
+      fired.current = countdown.elapsed_ms >= goMs;
+
+      // Un écran qui rejoint une séquence déjà lancée affiche le chiffre en
+      // cours sans le sonner : il ne lui reste qu'une fraction de seconde à
+      // vivre, et le bip tomberait à contretemps, juste avant celui du chiffre
+      // suivant. Il se joint aux suivants, qui sont à l'heure.
+      sounded.current = countdown.elapsed_ms > 0
+        ? String(Math.ceil((goMs - countdown.elapsed_ms) / 1000))
+        : null;
+    }
+
+    const { anchor } = sequence.current;
+
+    /**
+     * Affiche un chiffre, et le sonne s'il vient de changer.
+     *
+     * Le bip ne part que sur le changement, pas sur le rendu : c'est ce qui le
+     * garde à une note par seconde, et ce qui le place exactement à la seconde
+     * pleine plutôt qu'au premier rendu qui suit.
+     */
+    const announce = (next: string) => {
+      setLabel(next);
+
+      if (sounded.current === next) return;
+
+      sounded.current = next;
+      beep();
+    };
 
     const tick = () => {
       const elapsed = performance.now() - anchor;
@@ -152,7 +205,7 @@ export function DisplayCountdown({ clock }: { clock: Clock }) {
         // départ on est dans la troisième seconde, on affiche 3. Le chiffre
         // change donc sur la seconde pleine, et le « 1 » cède la place au coup
         // de feu, jamais avant.
-        setLabel(String(Math.ceil((goMs - elapsed) / 1000)));
+        announce(String(Math.ceil((goMs - elapsed) / 1000)));
       } else if (elapsed < goMs + FLASH_MS) {
         setLabel(GO);
 

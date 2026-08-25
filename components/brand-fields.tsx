@@ -20,15 +20,20 @@ import {
  * Tailles proposées, en pourcentage de la taille normale.
  *
  * Une liste fermée plutôt qu'un champ libre : le réglage ne demande pas de
- * précision au centième. Les pas se desserrent vers le haut — entre 100 et
- * 125 % l'écart se voit, entre 300 et 325 % non.
+ * précision au centième. Les pas se resserrent autour de 100 % et se desserrent
+ * en s'en éloignant — entre 100 et 125 % l'écart se voit, entre 300 et 325 %
+ * non.
  *
  * Jusqu'au quadruple : un écran dédié à une seule épreuve, lu du fond d'un
- * stade, demande des chiffres bien plus gros que la normale. Passé un certain
- * point la liste affiche moins de lignes — elle se coupe proprement plutôt que
- * de déborder.
+ * stade, demande des chiffres bien plus gros que la normale. Jusqu'à la moitié
+ * dans l'autre sens : une zone étroite qui doit tenir vingt lignes de
+ * classement demande l'inverse. La moitié est le plancher de l'API, pas un
+ * choix d'affichage. Passé un certain point la liste affiche moins de lignes —
+ * elle se coupe proprement plutôt que de déborder.
  */
 const SCALES = [
+  "0.5",
+  "0.6",
   "0.75",
   "0.9",
   "1",

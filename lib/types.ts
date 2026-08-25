@@ -73,6 +73,14 @@ export type EventStatus =
   | "archived";
 export type PublicationMode = "manual" | "auto";
 
+/**
+ * Comment les séries reçues d'une application rejoignent le programme.
+ *
+ * En automatique, une série rejoint l'épreuve du programme qui porte le même
+ * nom. En manuel, l'organisateur les rapproche lui-même.
+ */
+export type AttachmentMode = "manual" | "auto";
+
 export type LiveEvent = {
   id: string;
   organization_id: string;
@@ -86,8 +94,22 @@ export type LiveEvent = {
   status: EventStatus;
   status_label: string;
   publication_mode: PublicationMode;
+  attachment_mode: AttachmentMode;
   /** Nul : l'événement suit la charte par défaut de son organisation. */
   brand_id: string | null;
+  /**
+   * L'emote en cours, montrée par tous les écrans à la fois.
+   *
+   * Nulle la plupart du temps : une emote s'affiche quelques secondes. Tant
+   * qu'elle est là, elle passe devant ce que montre chaque écran, sans rien
+   * effacer — la retirer rend chacun à sa composition ou à son propre carton.
+   */
+  emote_image_id: string | null;
+  /** Instant où elle cesse d'elle-même ; nul : elle reste jusqu'au retrait. */
+  emote_expires_at: string | null;
+  /** La durée demandée ; nulle : jusqu'au retrait. */
+  emote_duration_ms: number | null;
+  emote?: EventImage | null;
   is_publicly_visible: boolean;
   disciplines_count?: number;
   participants_count?: number;
@@ -454,7 +476,16 @@ export type RenderedZone = {
   config: DisplayZoneConfig;
   geometry: ZoneGeometry | null;
   content:
-    | { discipline: PublicDiscipline; results: PublicResult[] }
+    | {
+        /**
+         * Nulle avant le premier résultat publié : une zone « Derniers
+         * résultats » n'a alors aucune épreuve à désigner. Le champ est présent
+         * malgré tout — c'est ce qui rend le `null` obligatoire ici plutôt
+         * qu'un membre d'union de plus.
+         */
+        discipline: PublicDiscipline | null;
+        results: PublicResult[];
+      }
     | { results: PublicResult[] }
     | { video: PublicVideo; loop: boolean; muted: boolean }
     | null;
@@ -475,7 +506,20 @@ export type RenderedDisplay = {
    * Tant qu'il est là, la composition n'est pas rendue : c'est ce qu'on attend
    * d'un carton « Qualifications » — pas une vignette dans un coin.
    */
-  image: { url: string; width: number; height: number } | null;
+  image: {
+    url: string;
+    width: number;
+    height: number;
+    /**
+     * Combien de temps une emote doit rester à l'écran, en millisecondes —
+     * nul si rien ne la fait cesser, ou si ce visuel n'est pas une emote.
+     *
+     * La durée **demandée**, décomptée à partir du moment où l'écran l'affiche.
+     * Ni une date — un ordinateur de tribune est rarement à l'heure — ni le
+     * temps restant, qui aurait fait payer à l'affichage le trajet du message.
+     */
+    duration_ms: number | null;
+  } | null;
   clock: Clock;
 };
 

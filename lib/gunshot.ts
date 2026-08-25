@@ -131,6 +131,44 @@ export function fireGunshot(): void {
 }
 
 /**
+ * Le bip d'un chiffre du compte à rebours.
+ *
+ * Synthétisé plutôt que chargé : c'est une sinusoïde de deux dixièmes de
+ * seconde, et un fichier de plus à télécharger, décoder et tenir prêt n'aurait
+ * rien apporté qu'une occasion supplémentaire d'arriver en retard.
+ *
+ * Il accompagne le chiffre affiché : le même signal, donné aux yeux et aux
+ * oreilles en même temps. Un athlète en position de départ ne regarde pas
+ * l'écran.
+ *
+ * Une seule note, identique à chaque chiffre — ce qui distingue le départ,
+ * c'est le coup de feu qui suit, pas un bip plus aigu que les autres.
+ */
+export function beep(): void {
+  void unlockAudio();
+
+  if (!context || context.state !== "running") return;
+
+  const now = context.currentTime;
+  const duration = 0.18;
+
+  const oscillator = context.createOscillator();
+  oscillator.type = "sine";
+  oscillator.frequency.value = 880;
+
+  // Attaque et extinction douces : un créneau net produit un claquement qui
+  // s'entend plus que la note elle-même sur une sono de stade.
+  const gain = context.createGain();
+  gain.gain.setValueAtTime(0.0001, now);
+  gain.gain.exponentialRampToValueAtTime(0.35, now + 0.012);
+  gain.gain.exponentialRampToValueAtTime(0.0001, now + duration);
+
+  oscillator.connect(gain).connect(context.destination);
+  oscillator.start(now);
+  oscillator.stop(now + duration);
+}
+
+/**
  * Détonation de synthèse : un bruit blanc très bref, saturé et filtré.
  *
  * Ce n'est pas un vrai pistolet, mais c'est net, sec, et cela part au bon
