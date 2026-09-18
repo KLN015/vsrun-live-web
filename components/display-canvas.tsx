@@ -1,6 +1,7 @@
 import type { ReactNode } from "react";
 import { AutoScroll } from "@/components/auto-scroll";
 import { BrandFontFaces } from "@/components/brand-faces";
+import { DuelZoneView } from "@/components/duel-zone";
 import { brandStyle, scaled, type Brand } from "@/lib/brand";
 import {
   DISPLAY_LAYOUT_GRID,
@@ -73,14 +74,10 @@ export function DisplayCanvas({
 }
 
 /**
- * Le rectangle qu'occupe la zone d'un écran à découpage libre.
+ * Le rectangle qu'occupe une zone d'un écran à découpage libre.
  *
  * Une zone jamais placée occupe toute la toile. Un écran fraîchement créé doit
  * montrer son logo, pas une surface noire dont rien ne dit qu'elle fonctionne.
- *
- * Partagé, parce que la zone n'est plus seule à connaître ce rectangle : le
- * compte à rebours s'y centre. Deux calculs de la même chose divergeraient au
- * premier changement, et le décompte se décalerait de la composition.
  */
 export function freeGeometry(
   zone: RenderedZone | undefined,
@@ -92,38 +89,35 @@ export function freeGeometry(
 }
 
 /**
- * L'unique zone d'un écran à découpage libre.
+ * Le rectangle qui enveloppe toutes les zones d'une toile libre.
  *
- * Cette zone **est** l'écran : elle porte son habillage — logo, chronomètre —
- * et confine tout ce qu'elle montre à son rectangle. Ce que l'organisateur
- * place en (x, y) sur la toile délimite donc la totalité de ce que verra la
- * tribune, visuels compris.
+ * C'est « la composition » : ce que l'organisateur a posé, et rien d'autre. Le
+ * compte à rebours s'y centre, un visuel la recouvre. Une seule zone, c'est
+ * elle-même — le comportement d'avant, quand il n'y en avait qu'une ; trois
+ * zones, c'est leur enveloppe, et pas la toile entière, sinon un carton posé
+ * pour une composition rangée dans un coin s'étalerait sur tout le mur.
  *
- * C'est la différence avec une case de grille, qui ne connaît ni sa place ni
- * l'habillage posé au-dessus d'elle : le découpage libre a son rendu propre
- * plutôt qu'un `if` de plus dans DisplayCanvas.
+ * Partagé, parce que plusieurs rendus s'y calent : deux calculs de la même
+ * chose divergeraient au premier changement.
  */
-export function FreeZone({
-  zone,
-  canvas,
-  brand,
-  header,
-  image,
-  compact = false,
-}: {
-  zone?: RenderedZone;
-  /** La toile, repère des coordonnées de la zone. */
-  canvas: { width: number; height: number };
-  brand?: Brand;
-  /** L'habillage, rendu au sommet de la zone. */
-  header?: ReactNode;
-  /** Un visuel affiché : il prend la place du contenu, dans la même zone. */
-  image?: { url: string } | null;
-  compact?: boolean;
-}) {
-  const geometry = freeGeometry(zone, canvas);
+export function freeBounds(
+  zones: RenderedZone[],
+  canvas: { width: number; height: number },
+): ZoneGeometry {
+  if (zones.length === 0) return freeGeometry(undefined, canvas);
 
-  const frame = {
+  const rects = zones.map((zone) => freeGeometry(zone, canvas));
+  const left = Math.min(...rects.map((r) => r.x));
+  const top = Math.min(...rects.map((r) => r.y));
+  const right = Math.max(...rects.map((r) => r.x + r.width));
+  const bottom = Math.max(...rects.map((r) => r.y + r.height));
+
+  return { x: left, y: top, width: right - left, height: bottom - top };
+}
+
+/** Un rectangle posé sur la toile, aux couleurs de la charte. */
+function frameStyle(geometry: ZoneGeometry, brand?: Brand) {
+  return {
     position: "absolute" as const,
     left: geometry.x,
     top: geometry.y,
@@ -133,32 +127,95 @@ export function FreeZone({
       ? "color-mix(in srgb, var(--brand-text) 6%, var(--brand-background))"
       : undefined,
   };
+}
 
-  // Un visuel prend la zone entière : ni habillage, ni marge. Une affiche, un
-  // carton de départ, une photo de podium se lisent en grand ou ne se lisent
-  // pas ; le logo posé au-dessus ne faisait que rogner la seule chose qu'on
-  // est venu regarder — et il reparaît dès que le visuel se retire.
-  //
-  // `object-contain` reste la règle à l'intérieur de ce rectangle : le
-  // rogner couperait le texte d'une affiche.
-  if (image) {
-    return (
-      <div
-        style={frame}
-        className={cn(
-          "overflow-hidden rounded-md",
-          brand ? "" : "bg-neutral-900",
-        )}
-      >
-        {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img src={image.url} alt="" className="h-full w-full object-contain" />
-      </div>
-    );
-  }
-
+/**
+ * Un visuel sur une toile libre : il recouvre la composition, bord à bord.
+ *
+ * Ni habillage, ni marge. Une affiche, un carton de départ, une photo de
+ * podium se lisent en grand ou ne se lisent pas ; le logo posé au-dessus ne
+ * faisait que rogner la seule chose qu'on est venu regarder — et il reparaît
+ * dès que le visuel se retire.
+ *
+ * `object-contain` reste la règle à l'intérieur du rectangle : le rogner
+ * couperait le texte d'une affiche.
+ */
+export function FreeVisual({
+  bounds,
+  brand,
+  image,
+}: {
+  bounds: ZoneGeometry;
+  brand?: Brand;
+  image: { url: string };
+}) {
   return (
     <div
-      style={frame}
+      style={frameStyle(bounds, brand)}
+      className={cn("overflow-hidden rounded-md", brand ? "" : "bg-neutral-900")}
+    >
+      {/* eslint-disable-next-line @next/next/no-img-element */}
+      <img src={image.url} alt="" className="h-full w-full object-contain" />
+    </div>
+  );
+}
+
+/**
+ * Une zone d'un écran à découpage libre.
+ *
+ * Elle porte sa place — ce que l'organisateur a posé en (x, y) sur la toile —
+ * et confine tout ce qu'elle montre à son rectangle, habillage compris :
+ * chaque zone a son logo, la première a en plus le chronomètre. C'est la
+ * différence avec une case de grille, qui ne connaît ni sa place ni
+ * l'habillage posé au-dessus d'elle : le découpage libre a son rendu propre
+ * plutôt qu'un `if` de plus dans DisplayCanvas.
+ */
+export function FreeZone({
+  zone,
+  canvas,
+  brand,
+  header,
+  compact = false,
+}: {
+  zone?: RenderedZone;
+  /** La toile, repère des coordonnées de la zone. */
+  canvas: { width: number; height: number };
+  brand?: Brand;
+  /** L'habillage, rendu au sommet de la zone. */
+  header?: ReactNode;
+  compact?: boolean;
+}) {
+  return (
+    <FreeFrame
+      geometry={freeGeometry(zone, canvas)}
+      brand={brand}
+      header={header}
+      compact={compact}
+    >
+      {zone && zone.content_type !== "empty" ? (
+        <Zone zone={zone} compact={compact} />
+      ) : null}
+    </FreeFrame>
+  );
+}
+
+/** Un cadre posé sur la toile libre : l'habillage en haut, le contenu dessous. */
+function FreeFrame({
+  geometry,
+  brand,
+  header,
+  compact = false,
+  children,
+}: {
+  geometry: ZoneGeometry;
+  brand?: Brand;
+  header?: ReactNode;
+  compact?: boolean;
+  children: ReactNode;
+}) {
+  return (
+    <div
+      style={frameStyle(geometry, brand)}
       className={cn(
         "flex flex-col overflow-hidden rounded-md",
         compact ? "gap-1 p-1.5" : "gap-4 p-6",
@@ -167,11 +224,7 @@ export function FreeZone({
     >
       {header}
 
-      <div className="min-h-0 flex-1">
-        {zone && zone.content_type !== "empty" ? (
-          <Zone zone={zone} compact={compact} />
-        ) : null}
-      </div>
+      <div className="min-h-0 flex-1">{children}</div>
     </div>
   );
 }
@@ -185,6 +238,10 @@ function Zone({ zone, compact }: { zone: RenderedZone; compact: boolean }) {
         </span>
       </div>
     );
+  }
+
+  if ("duel" in zone.content) {
+    return <DuelZoneView duel={zone.content.duel} compact={compact} />;
   }
 
   if ("video" in zone.content) {

@@ -3,8 +3,9 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import {
   DisplayCanvas,
+  FreeVisual,
   FreeZone,
-  freeGeometry,
+  freeBounds,
 } from "@/components/display-canvas";
 import { DisplayChrome } from "@/components/display-chrome";
 import { DisplayClock, DisplayCountdown } from "@/components/display-clock";
@@ -78,6 +79,7 @@ export function LiveDisplay({
       ".result.updated",
       ".result.unpublished",
       ".display.configuration-updated",
+      ".duel.updated",
     ]) {
       channel.listen(name, () => void refresh());
     }
@@ -155,12 +157,16 @@ export function LiveDisplay({
     `,
   };
 
+  const logo = (
+    <DisplayChrome
+      live={display.event.status === "live"}
+      logoUrl={display.brand.logo_url}
+    />
+  );
+
   const chrome = (
     <>
-      <DisplayChrome
-        live={display.event.status === "live"}
-        logoUrl={display.brand.logo_url}
-      />
+      {logo}
 
       {showsClock ? <DisplayClock clock={clock} /> : null}
     </>
@@ -174,40 +180,55 @@ export function LiveDisplay({
   );
 
   if (free) {
-    const geometry = freeGeometry(display.zones[0], display.canvas);
+    // Toutes les zones, dans l'ordre où l'organisateur les a numérotées.
+    // Chacune porte le logo — une zone est un cadre à part entière, posé où
+    // on veut sur le mur, et un cadre sans logo a l'air d'un bloc oublié. Le
+    // chronomètre, lui, ne va qu'à la première : un seul temps qui défile.
+    // Une zone sans place occupe toute la toile.
+    const zones = [...display.zones].sort((a, b) => a.position - b.position);
+    const bounds = freeBounds(zones, display.canvas);
 
     return (
       <div className="h-full w-full" style={surface}>
         <BrandFontFaces brand={display.brand} />
 
-        {/* La toile est l'écran entier ; la zone y délimite tout ce qui
-            s'affiche. Son rectangle porte l'habillage comme le contenu : rien
-            ne déborde de ce que l'organisateur a placé. */}
+        {/* La toile est l'écran entier ; les zones y délimitent tout ce qui
+            s'affiche. Leurs rectangles portent l'habillage comme le contenu :
+            rien ne déborde de ce que l'organisateur a placé. */}
         <FreeCanvas
           width={display.canvas.width}
           height={display.canvas.height}
         >
           <div className="relative h-full w-full">
-            <FreeZone
-              zone={display.zones[0]}
-              canvas={display.canvas}
-              brand={display.brand}
-              header={chrome}
-              image={image}
-            />
+            {image ? (
+              // Un visuel recouvre la composition entière — l'enveloppe des
+              // zones, pas la toile : un carton posé pour une composition
+              // rangée dans un coin ne s'étale pas sur tout le mur.
+              <FreeVisual bounds={bounds} brand={display.brand} image={image} />
+            ) : (
+              zones.map((zone, index) => (
+                <FreeZone
+                  key={zone.position}
+                  zone={zone}
+                  canvas={display.canvas}
+                  brand={display.brand}
+                  header={index === 0 ? chrome : logo}
+                />
+              ))
+            )}
 
             {/* Le compte à rebours appartient à la composition, pas à l'écran :
-                il couvre le rectangle de la zone et s'y centre. Une zone posée
-                dans un coin d'un mur garde son décompte au même endroit que ses
-                résultats — le chercher ailleurs n'aurait aucun sens pour qui
-                regarde. */}
+                il couvre l'enveloppe des zones et s'y centre. Une composition
+                posée dans un coin d'un mur garde son décompte au même endroit
+                que ses résultats — le chercher ailleurs n'aurait aucun sens
+                pour qui regarde. */}
             <div
               className="absolute"
               style={{
-                left: geometry.x,
-                top: geometry.y,
-                width: geometry.width,
-                height: geometry.height,
+                left: bounds.x,
+                top: bounds.y,
+                width: bounds.width,
+                height: bounds.height,
               }}
             >
               <DisplayCountdown clock={clock} />

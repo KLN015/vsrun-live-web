@@ -548,6 +548,209 @@ export async function createResult(
   return { success: "Résultat enregistré en brouillon." };
 }
 
+// ---------------------------------------------------------------------------
+// Élimination directe
+//
+// Les gestes de l'opérateur au bord de la piste : appeler une série, désigner
+// un vainqueur, passer à la suivante. Chacun revalide la page de l'épreuve, et
+// le serveur prévient lui-même les écrans.
+// ---------------------------------------------------------------------------
+
+/** Une série écrite à la main. Un seul engagé : un exempt. */
+export async function createDuel(
+  _state: ActionState,
+  form: FormData,
+): Promise<ActionState> {
+  const disciplineId = text(form, "discipline_id");
+  const back = `/dashboard/disciplines/${disciplineId}`;
+
+  const result = await send(
+    `/disciplines/${disciplineId}/duels`,
+    json({
+      participant_a_id: text(form, "participant_a_id") || null,
+      participant_b_id: text(form, "participant_b_id") || null,
+    }),
+    back,
+  );
+
+  if (result.error) return result;
+
+  revalidatePath(back);
+
+  return { success: "Série ajoutée." };
+}
+
+/** Les séries d'un coup, depuis les engagés — tous, ou ceux qui sont cochés. */
+export async function generateDuels(
+  _state: ActionState,
+  form: FormData,
+): Promise<ActionState> {
+  const disciplineId = text(form, "discipline_id");
+  const back = `/dashboard/disciplines/${disciplineId}`;
+  const selected = form.getAll("participant_ids").map(String).filter(Boolean);
+
+  const result = await send(
+    `/disciplines/${disciplineId}/duels/generate`,
+    {
+      ...json({
+        participant_ids: selected.length > 0 ? selected : null,
+        shuffle: text(form, "order") === "random",
+      }),
+      method: "POST",
+    },
+    back,
+    (body) => body,
+  );
+
+  if (result.error) return result;
+
+  revalidatePath(back);
+
+  const created =
+    (result.body as { data?: { created?: number } })?.data?.created ?? 0;
+
+  return {
+    success: `${created} série${created > 1 ? "s" : ""} composée${created > 1 ? "s" : ""}.`,
+  };
+}
+
+/** Le tour suivant, composé des vainqueurs : une nouvelle épreuve. */
+export async function createNextRound(
+  _state: ActionState,
+  form: FormData,
+): Promise<ActionState> {
+  const disciplineId = text(form, "discipline_id");
+  const back = `/dashboard/disciplines/${disciplineId}`;
+
+  const result = await send(
+    `/disciplines/${disciplineId}/duels/next-round`,
+    { ...json({ shuffle: text(form, "order") === "random" }), method: "POST" },
+    back,
+    (body) => body,
+  );
+
+  if (result.error) return result;
+
+  const next = (result.body as { data?: { id?: string; event_id?: string } })
+    ?.data;
+
+  if (next?.event_id)
+    revalidatePath(`/dashboard/events/${next.event_id}/disciplines`);
+
+  redirect(next?.id ? `/dashboard/disciplines/${next.id}` : back);
+}
+
+/**
+ * Clôturer une épreuve, ou la rouvrir — rien d'autre ne bouge.
+ *
+ * `updateDiscipline` renvoie tous les champs du formulaire complet : passer par
+ * elle pour un seul bouton effacerait la catégorie et le tour. Un geste, un
+ * champ.
+ */
+export async function setDisciplineStatus(form: FormData): Promise<void> {
+  const disciplineId = text(form, "discipline_id");
+  const back = `/dashboard/disciplines/${disciplineId}`;
+
+  await send(
+    `/disciplines/${disciplineId}`,
+    { ...json({ status: text(form, "status") }), method: "PATCH" },
+    back,
+  );
+
+  revalidatePath(back);
+}
+
+/** « On est sur cette série » — identifiant vide : sur aucune. */
+export async function setCurrentDuel(form: FormData): Promise<void> {
+  const disciplineId = text(form, "discipline_id");
+  const back = `/dashboard/disciplines/${disciplineId}`;
+
+  await send(
+    `/disciplines/${disciplineId}/current-duel`,
+    { ...json({ duel_id: text(form, "duel_id") || null }), method: "PUT" },
+    back,
+  );
+
+  revalidatePath(back);
+}
+
+export async function advanceDuel(form: FormData): Promise<void> {
+  const disciplineId = text(form, "discipline_id");
+  const back = `/dashboard/disciplines/${disciplineId}`;
+
+  await send(
+    `/disciplines/${disciplineId}/current-duel/next`,
+    { method: "POST" },
+    back,
+  );
+  revalidatePath(back);
+}
+
+/** A a battu B. Cliquer l'autre corrige ; un identifiant vide efface. */
+export async function declareDuelWinner(form: FormData): Promise<void> {
+  const duelId = text(form, "duel_id");
+  const participantId = text(form, "participant_id");
+  const back = text(form, "back") ?? "/dashboard";
+
+  await send(
+    `/duels/${duelId}/winner`,
+    participantId
+      ? { ...json({ participant_id: participantId }), method: "PUT" }
+      : { method: "DELETE" },
+    back,
+  );
+
+  revalidatePath(back);
+}
+
+/** Inverse les côtés : ce qui était à gauche passe à droite. */
+export async function swapDuel(form: FormData): Promise<void> {
+  const duelId = text(form, "duel_id");
+  const back = text(form, "back") ?? "/dashboard";
+
+  await send(
+    `/duels/${duelId}`,
+    { ...json({ swap: true }), method: "PATCH" },
+    back,
+  );
+  revalidatePath(back);
+}
+
+/** Donne un adversaire à un exempt, ou change les engagés d'une série. */
+export async function reassignDuel(
+  _state: ActionState,
+  form: FormData,
+): Promise<ActionState> {
+  const duelId = text(form, "duel_id");
+  const back = text(form, "back") ?? "/dashboard";
+
+  const result = await send(
+    `/duels/${duelId}`,
+    {
+      ...json({
+        participant_a_id: text(form, "participant_a_id") || null,
+        participant_b_id: text(form, "participant_b_id") || null,
+      }),
+      method: "PATCH",
+    },
+    back,
+  );
+
+  if (result.error) return result;
+
+  revalidatePath(back);
+
+  return { success: "Série modifiée." };
+}
+
+export async function deleteDuel(form: FormData): Promise<void> {
+  const duelId = text(form, "duel_id");
+  const back = text(form, "back") ?? "/dashboard";
+
+  await send(`/duels/${duelId}`, { method: "DELETE" }, back);
+  revalidatePath(back);
+}
+
 export async function deleteResult(form: FormData): Promise<void> {
   const resultId = text(form, "result_id");
   const back = text(form, "back") ?? "/dashboard";
@@ -748,6 +951,11 @@ export async function updateDisplayZones(
     if (contentType === "latest_results") {
       config.discipline_id = disciplineId ?? null;
       if (limit) config.limit = Number(limit);
+    }
+
+    if (contentType === "duel") {
+      config.discipline_id = disciplineId ?? null;
+      config.side = text(form, `zone_${position}_side`) ?? "both";
     }
 
     const geometry = free

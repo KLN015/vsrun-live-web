@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { AutoRefresh } from "@/components/auto-refresh";
+import { DuelPanel } from "@/components/duel-panel";
 import { FormDialog } from "@/components/form-dialog";
 import { FormSelect } from "@/components/form-select";
 import { EmptyState, Field, PageHeader } from "@/components/layout";
@@ -53,6 +54,8 @@ const UNITS_BY_TYPE: Record<Discipline["type"], string[]> = {
   height: ["m", "cm"],
   points: ["pts"],
   custom: ["s", "m", "cm", "km_h", "pts"],
+  // Un duel n'a pas de mesure : ses séries tiennent lieu de résultats.
+  duel: [],
 };
 
 const stampFormatter = new Intl.DateTimeFormat("fr-FR", {
@@ -131,7 +134,9 @@ export default async function DisciplineResultsPage({
           windIsSharedBy(discipline) && discipline.wind !== null
             ? `vent ${discipline.wind > 0 ? "+" : ""}${discipline.wind} m/s`
             : null,
-          `${results.length} résultat(s)`,
+          discipline.type === "duel"
+            ? `${discipline.duels?.length ?? 0} série(s)`
+            : `${results.length} résultat(s)`,
         ]
           .filter(Boolean)
           .join(" · ")}
@@ -369,6 +374,17 @@ export default async function DisciplineResultsPage({
         </p>
       ) : null}
 
+      {/* Un duel n'a pas de résultats mesurés : ses séries tiennent lieu de
+          tout, et l'opérateur a besoin d'un poste, pas d'une table. */}
+      {discipline.type === "duel" ? (
+        <DuelPanel
+          discipline={discipline}
+          participants={participants}
+          back={path}
+        />
+      ) : null}
+
+      {discipline.type === "duel" ? null : (
       <div className="space-y-6">
         <div>
           {results.length === 0 ? (
@@ -614,6 +630,7 @@ export default async function DisciplineResultsPage({
           )}
         </div>
       </div>
+      )}
     </>
   );
 }

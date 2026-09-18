@@ -2,6 +2,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import type { Metadata } from "next";
 import { ButtonLink, EmptyState, PageHeader } from "@/components/layout";
+import { PublicDuels } from "@/components/public-duels";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
 import { Branded } from "@/components/branded";
@@ -173,7 +174,10 @@ export default async function PublicEventPage({
                             : "—"}
                         </span>
 
-                        <div>
+                        {/* `min-w-0 flex-1` : la liste des séries d'un duel
+                            prend la largeur qui reste, sinon les noms se
+                            coupent au tiers de la carte. */}
+                        <div className="min-w-0 flex-1">
                           {count > 0 ? (
                             <Link
                               href={`/events/${event.slug}/results?discipline=${discipline.id}`}
@@ -193,13 +197,21 @@ export default async function PublicEventPage({
                               discipline.distance_m
                                 ? `${discipline.distance_m} m`
                                 : null,
-                              count > 0
-                                ? `${count} résultat${count > 1 ? "s" : ""}`
-                                : "En attente de résultats",
+                              discipline.type === "duel"
+                                ? `${discipline.duels?.length ?? 0} série${(discipline.duels?.length ?? 0) > 1 ? "s" : ""}`
+                                : count > 0
+                                  ? `${count} résultat${count > 1 ? "s" : ""}`
+                                  : "En attente de résultats",
                             ]
                               .filter(Boolean)
                               .join(" · ")}
                           </p>
+
+                          {/* Les séries d'un duel sont ses résultats : elles
+                              se lisent ici, sans page à ouvrir. */}
+                          {discipline.type === "duel" ? (
+                            <PublicDuels discipline={discipline} />
+                          ) : null}
                         </div>
                       </div>
 

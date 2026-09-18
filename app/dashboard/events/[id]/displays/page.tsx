@@ -2,7 +2,7 @@ import Link from "next/link";
 import { ActionForm } from "@/components/action-form";
 import { ClockControls } from "@/components/clock-controls";
 import { FormDialog } from "@/components/form-dialog";
-import { DisplayZoneEditor } from "@/components/display-zone-editor";
+import { ZoneEditors } from "@/components/zone-editors";
 import {
   DisplayImagePicker,
   EventEmote,
@@ -298,22 +298,18 @@ function DisplayPanel({
           submitLabel="Envoyer vers l'écran"
         >
           <input type="hidden" name="display_id" value={display.id} />
-          <input type="hidden" name="zone_count" value={display.zone_count} />
           <input type="hidden" name="layout" value={display.layout} />
           <input type="hidden" name="back" value={back} />
 
-          <div className="grid gap-3 sm:grid-cols-2">
-            {Array.from({ length: display.zone_count }, (_, index) => (
-              <DisplayZoneEditor
-                key={index + 1}
-                position={index + 1}
-                zone={zones.find((zone) => zone.position === index + 1)}
-                disciplines={disciplines}
-                videos={videos}
-                canvas={display.layout === "free" ? display.canvas : undefined}
-              />
-            ))}
-          </div>
+          <ZoneEditors
+            layout={display.layout}
+            initialCount={display.zone_count}
+            maxZones={display.max_zones}
+            zones={zones}
+            disciplines={disciplines}
+            videos={videos}
+            canvas={display.canvas}
+          />
         </ActionForm>
 
         <div>
@@ -394,23 +390,26 @@ function DisplayPreview({
   // zones en proportion. Les pourcentages suffisent ici — la boîte a le même
   // rapport largeur/hauteur que la toile, rien ne peut se déformer.
   if (layout === "free") {
-    const zone = zones[0];
-
-    // Jamais placée, la zone occupe toute la toile — comme à l'écran.
-    const geometry = zone?.geometry ?? {
-      x: 0,
-      y: 0,
-      width: canvas.width,
-      height: canvas.height,
-    };
+    // Jamais placée, une zone occupe toute la toile — comme à l'écran.
+    const placed = (zones.length > 0 ? zones : [undefined]).map((zone) => ({
+      zone,
+      geometry: zone?.geometry ?? {
+        x: 0,
+        y: 0,
+        width: canvas.width,
+        height: canvas.height,
+      },
+    }));
 
     return (
       <div
         className="relative w-full max-w-md rounded-md bg-neutral-950"
         style={{ aspectRatio: `${canvas.width} / ${canvas.height}` }}
       >
+        {placed.map(({ zone, geometry }, index) => (
         <div
-          className="absolute flex flex-col gap-1 overflow-hidden rounded bg-neutral-800 p-1.5"
+          key={zone?.position ?? index}
+          className="absolute flex flex-col gap-1 overflow-hidden rounded bg-neutral-800 p-1.5 ring-1 ring-neutral-700"
           style={{
             left: `${(geometry.x / canvas.width) * 100}%`,
             top: `${(geometry.y / canvas.height) * 100}%`,
@@ -418,9 +417,9 @@ function DisplayPreview({
             height: `${(geometry.height / canvas.height) * 100}%`,
           }}
         >
-          {/* L'habillage est dans la zone, pas au-dessus : c'est son rectangle
-              qui délimite tout ce que verra la tribune. Un visuel le remplace
-              entièrement — l'aperçu le montre comme l'écran le fera. */}
+          {/* L'habillage est dans chaque zone, pas au-dessus : ce sont les
+              rectangles qui délimitent tout ce que verra la tribune. Un
+              visuel les recouvre — l'aperçu le montre comme l'écran le fera. */}
           {image ? null : (
             <p className="shrink-0 truncate text-[9px] text-neutral-500">logo</p>
           )}
@@ -429,6 +428,7 @@ function DisplayPreview({
             {image ? image.name : (zone?.content_type_label ?? "Vide")}
           </div>
         </div>
+        ))}
       </div>
     );
   }

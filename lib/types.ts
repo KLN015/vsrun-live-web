@@ -120,7 +120,9 @@ export type DisciplineType =
   | "distance"
   | "height"
   | "points"
-  | "custom";
+  | "custom"
+  /** Élimination directe : des séries de deux, un vainqueur, pas de mesure. */
+  | "duel";
 
 export type Discipline = {
   id: string;
@@ -155,6 +157,10 @@ export type Discipline = {
   origin_label: string;
   merged_into_discipline_id: string | null;
 
+  /** Élimination directe : la série sur laquelle on est, et les séries. */
+  current_duel_id: string | null;
+  duels?: Duel[];
+
   /**
    * Contexte transmis par l'application émettrice : `training`,
    * `training_date`, `training_id`. C'est ce qui distingue quatre séries
@@ -184,6 +190,8 @@ export type Participant = {
   first_name: string | null;
   last_name: string | null;
   display_name: string;
+  /** « Camille A. » — le nom des écrans de duel. */
+  short_name: string;
   bib: string | null;
   club: string | null;
   category: string | null;
@@ -230,6 +238,8 @@ export type PublicParticipant = {
   first_name: string | null;
   last_name: string | null;
   display_name: string;
+  /** « Camille A. » — le nom des écrans de duel. */
+  short_name: string;
   bib: string | null;
   club: string | null;
   category: string | null;
@@ -280,6 +290,64 @@ export type PublicDiscipline = {
   round_label: string | null;
 
   results_count?: number;
+
+  /** Élimination directe : les séries tiennent lieu de résultats. */
+  current_duel_id: string | null;
+  duels?: PublicDuel[];
+};
+
+/**
+ * Une série d'élimination directe : deux engagés, un vainqueur.
+ *
+ * Le côté A et le côté B ne sont pas symétriques : chaque écran en montre un.
+ * Un seul engagé, c'est un exempt — vainqueur d'office.
+ */
+export type Duel = {
+  id: string;
+  discipline_id: string;
+  position: number;
+  participant_a_id: string | null;
+  participant_b_id: string | null;
+  winner_participant_id: string | null;
+  is_bye: boolean;
+  finished_at: string | null;
+  a?: Participant | null;
+  b?: Participant | null;
+};
+
+export type PublicDuel = {
+  id: string;
+  position: number;
+  a?: PublicParticipant | null;
+  b?: PublicParticipant | null;
+  winner_participant_id: string | null;
+  is_bye: boolean;
+};
+
+/** Le côté d'un duel que montre une zone d'écran. */
+export type DuelSide = "a" | "b" | "both";
+
+/** Ce qu'une zone « duel » reçoit : les faits, à l'écran d'en faire la scène. */
+export type RenderedDuel = {
+  discipline: PublicDiscipline;
+  side: DuelSide;
+  finished: boolean;
+  total: number;
+  current: {
+    id: string;
+    position: number;
+    a: PublicParticipant | null;
+    b: PublicParticipant | null;
+    winner_participant_id: string | null;
+    is_bye: boolean;
+  } | null;
+  upcoming: {
+    id: string;
+    position: number;
+    a: PublicParticipant | null;
+    b: PublicParticipant | null;
+  }[];
+  winners: PublicParticipant[];
 };
 
 export type PublicVideo = {
@@ -387,6 +455,7 @@ export const DISCIPLINE_TYPE_LABELS: Record<DisciplineType, string> = {
   height: "Hauteur",
   points: "Points",
   custom: "Personnalisé",
+  duel: "Duel — élimination directe",
 };
 
 export type ManagedVideo = {
@@ -411,6 +480,7 @@ export type DisplayContentType =
   | "discipline"
   | "latest_results"
   | "video"
+  | "duel"
   | "empty";
 
 export type DisplayZoneConfig = {
@@ -419,6 +489,8 @@ export type DisplayZoneConfig = {
   limit?: number;
   loop?: boolean;
   muted?: boolean;
+  /** Zone « duel » : le côté que montre cet écran. */
+  side?: DuelSide;
 };
 
 /**
@@ -459,7 +531,10 @@ export type Display = {
   layout: DisplayLayout;
   layout_label: string;
   canvas: { width: number; height: number };
+  /** Les cases d'une grille — ou ce qu'on a posé sur une toile libre. */
   zone_count: number;
+  /** Le plafond : celui de la grille, ou huit sur une toile libre. */
+  max_zones: number;
   /** Le visuel affiché à cet instant — il masque alors la composition. */
   image: EventImage | null;
   public_token: string;
@@ -488,6 +563,7 @@ export type RenderedZone = {
       }
     | { results: PublicResult[] }
     | { video: PublicVideo; loop: boolean; muted: boolean }
+    | { duel: RenderedDuel }
     | null;
 };
 
@@ -556,6 +632,7 @@ export const DISPLAY_CONTENT_LABELS: Record<DisplayContentType, string> = {
   discipline: "Épreuve",
   latest_results: "Derniers résultats",
   video: "Vidéo",
+  duel: "Duel",
   empty: "Vide",
 };
 
