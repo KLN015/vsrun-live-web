@@ -12,8 +12,8 @@ import { cn } from "@/lib/utils";
  * vainqueurs — et c'est ici qu'on décide de la scène :
  *
  *   - **épreuve close** : la liste des vainqueurs, c'est ce qu'on est venu voir ;
- *   - **aucune série appelée** : le nom de l'épreuve, et pour l'écran qui
- *     montre les deux côtés, qui s'apprête à courir ;
+ *   - **aucune série appelée** : le nom de l'épreuve et les séries à venir,
+ *     quel que soit le côté de l'écran — qui s'apprête à courir ;
  *   - **une série appelée** : le nom, en plein cadre. Le perdant est barré dès
  *     que le vainqueur est connu — c'est le geste qu'on attend d'un tableau.
  *
@@ -53,7 +53,10 @@ export function DuelZoneView({
         }
         compact={compact}
       >
-        {duel.side === "both" && duel.upcoming.length > 0 ? (
+        {/* Sans série appelée, tout écran montre les séries à venir — celui
+            d'un côté comme celui de tous. Un écran qui attend n'a rien de
+            mieux à faire que de dire au public qui va courir. */}
+        {duel.upcoming.length > 0 ? (
           <NameList
             items={duel.upcoming.map((s) => ({
               id: s.id,
