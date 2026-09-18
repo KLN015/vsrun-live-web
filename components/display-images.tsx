@@ -49,7 +49,7 @@ export function EventImageLibrary({
           trigger="Déposer un visuel"
           variant="outline"
           title="Nouveau visuel"
-          description="Une image PNG, JPEG ou WebP, réduite à 1920 px si elle dépasse. Un GIF, un WebP ou un PNG animé garde son animation et sa taille d'origine — de quoi servir d'emote. 16 Mo au plus."
+          description="Une image PNG, JPEG ou WebP, réduite à 1920 px si elle dépasse. Un GIF, un WebP ou un PNG animé garde son animation et sa taille d'origine — de quoi servir d'emote. 16 Mo et 80 mégapixels au plus."
           submitLabel="Déposer"
           action={uploadEventImage}
         >

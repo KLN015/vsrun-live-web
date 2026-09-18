@@ -308,11 +308,14 @@ export type Duel = {
   position: number;
   participant_a_id: string | null;
   participant_b_id: string | null;
+  /** Le troisième coureur, quand le compte est impair. */
+  participant_c_id: string | null;
   winner_participant_id: string | null;
   is_bye: boolean;
   finished_at: string | null;
   a?: Participant | null;
   b?: Participant | null;
+  c?: Participant | null;
 };
 
 export type PublicDuel = {
@@ -320,12 +323,13 @@ export type PublicDuel = {
   position: number;
   a?: PublicParticipant | null;
   b?: PublicParticipant | null;
+  c?: PublicParticipant | null;
   winner_participant_id: string | null;
   is_bye: boolean;
 };
 
-/** Le côté d'un duel que montre une zone d'écran. */
-export type DuelSide = "a" | "b" | "both";
+/** Le côté d'un duel que montre une zone d'écran ; `both` : tous. */
+export type DuelSide = "a" | "b" | "c" | "both";
 
 /** Ce qu'une zone « duel » reçoit : les faits, à l'écran d'en faire la scène. */
 export type RenderedDuel = {
@@ -338,6 +342,7 @@ export type RenderedDuel = {
     position: number;
     a: PublicParticipant | null;
     b: PublicParticipant | null;
+    c: PublicParticipant | null;
     winner_participant_id: string | null;
     is_bye: boolean;
   } | null;
@@ -346,6 +351,7 @@ export type RenderedDuel = {
     position: number;
     a: PublicParticipant | null;
     b: PublicParticipant | null;
+    c: PublicParticipant | null;
   }[];
   winners: PublicParticipant[];
 };

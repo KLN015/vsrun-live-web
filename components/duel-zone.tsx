@@ -55,7 +55,11 @@ export function DuelZoneView({
         {duel.side === "both" && duel.upcoming.length > 0 ? (
           <NameList
             names={duel.upcoming.map(
-              (s) => `${s.position}. ${label(s.a)} — ${label(s.b)}`,
+              (s) =>
+                `${s.position}. ${[s.a, s.b, s.c]
+                  .filter((p) => p !== null)
+                  .map(label)
+                  .join(" — ")}`,
             )}
             compact={compact}
           />
@@ -75,25 +79,28 @@ export function DuelZoneView({
         : "lost";
 
   if (duel.side === "both") {
+    // Autant de colonnes que de coureurs : deux, ou trois quand le compte
+    // était impair. Un côté vide n'a pas de colonne.
+    const runners = [serie.a, serie.b, serie.c].filter((p) => p !== null);
+
     return (
       <Frame title={title} subtitle={subtitle} compact={compact}>
         <div className="flex min-h-0 flex-1 gap-[2%]">
-          <Name
-            participant={serie.a}
-            outcome={outcome(serie.a)}
-            compact={compact}
-          />
-          <Name
-            participant={serie.b}
-            outcome={outcome(serie.b)}
-            compact={compact}
-          />
+          {(runners.length > 0 ? runners : [null]).map((p, i) => (
+            <Name
+              key={p?.id ?? i}
+              participant={p}
+              outcome={outcome(p)}
+              compact={compact}
+            />
+          ))}
         </div>
       </Frame>
     );
   }
 
-  const mine = duel.side === "a" ? serie.a : serie.b;
+  const mine =
+    duel.side === "a" ? serie.a : duel.side === "b" ? serie.b : serie.c;
 
   return (
     <Frame title={title} subtitle={subtitle} compact={compact}>
@@ -105,7 +112,7 @@ export function DuelZoneView({
 type Outcome = "pending" | "won" | "lost";
 
 function label(p: PublicParticipant | null): string {
-  return p?.short_name ?? "Exempt";
+  return p?.short_name ?? "—";
 }
 
 /** L'en-tête commun : l'épreuve en petit, l'état en dessous, puis la scène. */

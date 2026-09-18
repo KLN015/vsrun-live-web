@@ -36,6 +36,12 @@ export function PublicDuels({ discipline }: { discipline: PublicDiscipline }) {
           <Name duel={duel} participant={duel.a ?? null} />
           <span className="text-muted-foreground shrink-0 text-xs">vs</span>
           <Name duel={duel} participant={duel.b ?? null} />
+          {duel.c ? (
+            <>
+              <span className="text-muted-foreground shrink-0 text-xs">vs</span>
+              <Name duel={duel} participant={duel.c} />
+            </>
+          ) : null}
           {duel.id === current ? (
             <span className="text-destructive ml-auto shrink-0 text-xs uppercase">
               En cours

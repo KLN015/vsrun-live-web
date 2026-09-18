@@ -117,7 +117,7 @@ export function DisplayZoneEditor({
           </Field>
           <Field
             label="Côté"
-            hint="Deux écrans face à face : l'un montre le côté A, l'autre le côté B. Un troisième montre les deux."
+            hint="Un écran par couloir : A, B, et C pour les séries à trois. « Tous » montre tous les coureurs."
           >
             <FormSelect
               name={`zone_${position}_side`}
@@ -125,7 +125,8 @@ export function DisplayZoneEditor({
               options={[
                 { value: "a", label: "Côté A" },
                 { value: "b", label: "Côté B" },
-                { value: "both", label: "Les deux" },
+                { value: "c", label: "Côté C" },
+                { value: "both", label: "Tous" },
               ]}
             />
           </Field>

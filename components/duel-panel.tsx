@@ -129,18 +129,26 @@ export function DuelPanel({
                     type="submit"
                     variant="ghost"
                     size="sm"
-                    title="Inverser les côtés"
+                    title="Faire tourner les côtés"
                   >
                     <ArrowLeftRightIcon className="size-4" /> Inverser
                   </Button>
                 </form>
               </div>
 
-              {/* Les deux gros boutons : chacun est le nom d'un coureur. Le
-                  vainqueur reste enfoncé ; cliquer l'autre corrige. */}
-              <div className="grid grid-cols-2 gap-3">
+              {/* Un gros bouton par coureur : deux, ou trois. Le vainqueur
+                  reste enfoncé ; cliquer un autre corrige. */}
+              <div
+                className={cn(
+                  "grid gap-3",
+                  current.participant_c_id ? "grid-cols-3" : "grid-cols-2",
+                )}
+              >
                 <WinnerButton duel={current} side="a" back={back} />
                 <WinnerButton duel={current} side="b" back={back} />
+                {current.participant_c_id ? (
+                  <WinnerButton duel={current} side="c" back={back} />
+                ) : null}
               </div>
 
               <div className="flex flex-wrap gap-2">
@@ -235,7 +243,7 @@ export function DuelPanel({
           trigger="Ajouter une série"
           variant="outline"
           title="Une série"
-          description="Deux engagés. Un seul : un exempt, vainqueur d'office — vous pourrez lui donner un adversaire plus tard."
+          description="Deux engagés, ou trois. Un seul : un exempt, vainqueur d'office."
           submitLabel="Ajouter"
           action={createDuel}
         >
@@ -250,7 +258,14 @@ export function DuelPanel({
           <Field label="Côté B">
             <FormSelect
               name="participant_b_id"
-              placeholder="Personne (exempt)"
+              placeholder="Personne"
+              options={options}
+            />
+          </Field>
+          <Field label="Côté C" hint="Pour une série à trois.">
+            <FormSelect
+              name="participant_c_id"
+              placeholder="Personne"
               options={options}
             />
           </Field>
@@ -260,7 +275,7 @@ export function DuelPanel({
           trigger="Générer les séries"
           variant="outline"
           title="Composer les séries"
-          description="Deux par deux, dans l'ordre choisi. Un nombre impair laisse le dernier exempt, en dernière série. Les séries s'ajoutent à celles qui existent."
+          description="Deux par deux, dans l'ordre choisi. Un nombre impair fait courir le dernier avec la dernière paire : une série à trois. Les séries s'ajoutent à celles qui existent."
           submitLabel="Composer"
           action={generateDuels}
         >
@@ -314,6 +329,15 @@ export function DuelPanel({
   );
 }
 
+/** Le vainqueur d'une série jouée, quel que soit son côté. */
+function winnerOf(duel: Duel): Participant | null | undefined {
+  if (!duel.winner_participant_id) return null;
+
+  return (["a", "b", "c"] as const)
+    .map((side) => ({ id: duel[`participant_${side}_id`], p: duel[side] }))
+    .find(({ id }) => id === duel.winner_participant_id)?.p;
+}
+
 /** Le bouton qui dit qui a gagné. Enfoncé pour le vainqueur, barré pour le perdant. */
 function WinnerButton({
   duel,
@@ -321,11 +345,11 @@ function WinnerButton({
   back,
 }: {
   duel: Duel;
-  side: "a" | "b";
+  side: "a" | "b" | "c";
   back: string;
 }) {
-  const participant = side === "a" ? duel.a : duel.b;
-  const id = side === "a" ? duel.participant_a_id : duel.participant_b_id;
+  const participant = duel[side];
+  const id = duel[`participant_${side}_id`];
   const decided = duel.winner_participant_id !== null;
   const won = decided && duel.winner_participant_id === id;
   const lost = decided && !won;
@@ -353,7 +377,7 @@ function WinnerButton({
         )}
       >
         <span className="text-muted-foreground text-xs uppercase tracking-wide">
-          {side === "a" ? "Côté A" : "Côté B"}
+          Côté {side.toUpperCase()}
           {won ? " · vainqueur" : ""}
         </span>
         <span className="mt-1 text-xl font-semibold">
@@ -378,10 +402,7 @@ function DuelRow({
   options: { value: string; label: string }[];
   back: string;
 }) {
-  const winnerName = duel.winner_participant_id
-    ? (duel.winner_participant_id === duel.participant_a_id ? duel.a : duel.b)
-        ?.short_name
-    : null;
+  const winnerName = winnerOf(duel)?.short_name ?? null;
 
   // Le perdant est barré ; un exempt ne perd pas, il n'a personne en face.
   const name = (p: Participant | null | undefined, id: string | null) =>
@@ -415,6 +436,12 @@ function DuelRow({
         {name(duel.a, duel.participant_a_id)}
         <span className="text-muted-foreground shrink-0">vs</span>
         {name(duel.b, duel.participant_b_id)}
+        {duel.participant_c_id ? (
+          <>
+            <span className="text-muted-foreground shrink-0">vs</span>
+            {name(duel.c, duel.participant_c_id)}
+          </>
+        ) : null}
       </div>
 
       {isCurrent ? <Badge>En cours</Badge> : null}
@@ -438,7 +465,7 @@ function DuelRow({
             type="submit"
             variant="ghost"
             size="sm"
-            title="Inverser les côtés"
+            title="Faire tourner les côtés"
           >
             <ArrowLeftRightIcon className="size-4" />
           </Button>
@@ -448,7 +475,7 @@ function DuelRow({
           trigger="Modifier"
           variant="outline"
           title={`Série ${duel.position}`}
-          description="Changer un engagé remet le vainqueur en jeu. Un exempt reçoit ici son adversaire."
+          description="Changer un engagé remet le vainqueur en jeu. Le côté C sert aux séries à trois."
           submitLabel="Enregistrer"
           action={reassignDuel}
         >
@@ -466,6 +493,14 @@ function DuelRow({
             <FormSelect
               name="participant_b_id"
               defaultValue={duel.participant_b_id ?? ""}
+              placeholder="Personne"
+              options={options}
+            />
+          </Field>
+          <Field label="Côté C" hint="Pour une série à trois.">
+            <FormSelect
+              name="participant_c_id"
+              defaultValue={duel.participant_c_id ?? ""}
               placeholder="Personne"
               options={options}
             />

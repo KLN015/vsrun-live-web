@@ -569,6 +569,7 @@ export async function createDuel(
     json({
       participant_a_id: text(form, "participant_a_id") || null,
       participant_b_id: text(form, "participant_b_id") || null,
+      participant_c_id: text(form, "participant_c_id") || null,
     }),
     back,
   );
@@ -730,6 +731,7 @@ export async function reassignDuel(
       ...json({
         participant_a_id: text(form, "participant_a_id") || null,
         participant_b_id: text(form, "participant_b_id") || null,
+        participant_c_id: text(form, "participant_c_id") || null,
       }),
       method: "PATCH",
     },
