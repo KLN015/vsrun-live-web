@@ -1,3 +1,4 @@
+import { AutoScroll } from "@/components/auto-scroll";
 import { FittedText } from "@/components/fitted-text";
 import { scaled } from "@/lib/brand";
 import type { PublicParticipant, RenderedDuel } from "@/lib/types";
@@ -32,7 +33,7 @@ export function DuelZoneView({
     return (
       <Frame title={title} subtitle="Vainqueurs" compact={compact}>
         <NameList
-          names={duel.winners.map((p) => p.short_name)}
+          items={duel.winners.map((p) => ({ id: p.id, label: p.short_name }))}
           compact={compact}
         />
       </Frame>
@@ -54,13 +55,13 @@ export function DuelZoneView({
       >
         {duel.side === "both" && duel.upcoming.length > 0 ? (
           <NameList
-            names={duel.upcoming.map(
-              (s) =>
-                `${s.position}. ${[s.a, s.b, s.c]
-                  .filter((p) => p !== null)
-                  .map(label)
-                  .join(" — ")}`,
-            )}
+            items={duel.upcoming.map((s) => ({
+              id: s.id,
+              label: `${s.position}. ${[s.a, s.b, s.c]
+                .filter((p) => p !== null)
+                .map(label)
+                .join(" — ")}`,
+            }))}
             compact={compact}
           />
         ) : (
@@ -209,24 +210,41 @@ function Name({
   );
 }
 
-function NameList({ names, compact }: { names: string[]; compact: boolean }) {
-  if (names.length === 0) return <Waiting compact={compact} />;
+/**
+ * Une liste de lignes — les séries à venir, les vainqueurs.
+ *
+ * Elle défile par paliers quand elle déborde, comme un classement : seize
+ * séries ne tiennent pas sur un écran, et n'en montrer que six laissait la
+ * moitié des coureurs sans savoir quand ils passent.
+ */
+function NameList({
+  items,
+  compact,
+}: {
+  items: { id: string; label: string }[];
+  compact: boolean;
+}) {
+  if (items.length === 0) return <Waiting compact={compact} />;
 
   return (
-    <ol
-      className="mt-[2%] flex min-h-0 flex-1 flex-col justify-start overflow-hidden"
-      style={{ fontSize: scaled(compact ? "10px" : "2.75rem", "body") }}
-    >
-      {names.map((name, index) => (
-        <li
-          key={index}
-          className="truncate border-b border-neutral-800 py-[1%] font-semibold last:border-0"
-          style={{ fontFamily: "var(--brand-font-heading)" }}
-        >
-          {name}
-        </li>
-      ))}
-    </ol>
+    // Colonne flex : AutoScroll y prend toute la hauteur qui reste, et c'est
+    // cette hauteur bornée qui lui permet de savoir qu'il déborde.
+    <div className="mt-[2%] flex min-h-0 flex-1 flex-col">
+      <AutoScroll ids={items.map((item) => item.id)} enabled={!compact}>
+        <ol style={{ fontSize: scaled(compact ? "10px" : "2.75rem", "body") }}>
+          {items.map((item) => (
+            <li
+              key={item.id}
+              data-row={item.id}
+              className="truncate border-b border-neutral-800 py-[1%] font-semibold last:border-0"
+              style={{ fontFamily: "var(--brand-font-heading)" }}
+            >
+              {item.label}
+            </li>
+          ))}
+        </ol>
+      </AutoScroll>
+    </div>
   );
 }
 
